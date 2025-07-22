@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "discord.js": "^14.21.0",
+    "dotenv": "^17.2.0",
+    "full-icu": "^1.5.0",
+    "node-mcstatus": "^1.2.1"
+  },
+  "name": "alwination-bot",
+  "version": "1.0.0",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "NODE_ICU_DATA=./node_modules/full-icu node src/bot.js",
+    "deploy": "node deploy-commands.js",
+    "full-start": "npm run deploy && npm start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Zero",
+  "license": "ISC",
+  "description": "AlwiNation Official Bot — By Zero"
+}
