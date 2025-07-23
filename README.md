@@ -1,2 +1,2 @@
-# bot-discord-AlwiNation
-Discord Bot Assistant for AlwiNation Server
+# Discord Bot Assistant for AlwiNation Server
+Bot ini dirancang khusus untuk membantu manajemen dan otomatisasi server Discord AlwiNation, dengan berbagai fitur untuk memudahkan tugas staf dan meningkatkan interaksi anggota.
