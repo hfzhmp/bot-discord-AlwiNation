@@ -2,6 +2,7 @@
   "clientId": "1353573911068938352",
   "guildId": "1327298532826415206",
   "notificationChannelId": "1392130579729875045",
+  "maintenanceChannelId": "1393174278018433105",
   "allowedRoleIds": [
     "1327298533690179680", { "_note": "Owner" },
     "1331961946563416116", { "_note": "Supervisor" },
