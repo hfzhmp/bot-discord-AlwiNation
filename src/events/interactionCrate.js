@@ -9,6 +9,14 @@ async function handleChatInputCommand(interaction) {
     return;
   }
 
+  if (command.data.name === 'changelog') {
+    const attachment = interaction.options.getAttachment('gambar');
+    changelogDataStore.set(interaction.user.id, { 
+      text: null, 
+      imageUrl: attachment ? attachment.url : null 
+    });
+  }
+
   try {
     await command.execute(interaction);
   } catch (error) {
@@ -132,6 +140,82 @@ async function handleModalSubmit(interaction) {
       await interaction.editReply({ content: 'Terjadi error saat mengirim pengumuman.' });
     }
   }
+
+  else if (interaction.customId === 'changelogModal') {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+
+    const data = changelogDataStore.get(interaction.user.id);
+    if (!data) {
+      return interaction.editReply({ content: 'Sesi Anda telah berakhir, silakan mulai lagi dengan perintah /changelog.' });
+    }
+    
+    data.text = interaction.fields.getTextInputValue('changelogText');
+    
+    const realmOptions = Object.keys(config.realmsConfig).map(key => 
+      new StringSelectMenuOptionBuilder()
+        .setLabel(config.realmsConfig[key].name)
+        .setValue(key)
+    );
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('changelogRealmSelect')
+      .setPlaceholder('Pilih satu atau beberapa realms')
+      .setMinValues(1)
+      .setMaxValues(realmOptions.length)
+      .addOptions(realmOptions);
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    await interaction.editReply({
+      content: 'Changelog diterima. Sekarang, pilih realm(s) yang menerima pembaruan ini:',
+      components: [row],
+    });
+  }
+}
+
+async function handleSelectMenu(interaction) {
+  if (interaction.customId === 'changelogRealmSelect') {
+    await interaction.deferUpdate({ flags: [MessageFlags.Ephemeral] });
+
+    const selectedRealmKeys = interaction.values;
+    const data = changelogDataStore.get(interaction.user.id);
+
+    if (!data || !data.text) {
+      return interaction.editReply({ content: 'Terjadi error: Data changelog tidak ditemukan. Silakan coba lagi.', components: [] });
+    }
+
+    const targetChannel = await interaction.client.channels.fetch(config.changelogChannelId);
+    if (!targetChannel) {
+      return interaction.editReply({ content: 'Error: Channel changelog tidak ditemukan.', components: [] });
+    }
+
+    const realmNames = selectedRealmKeys.map(key => config.realmsConfig[key].name);
+    const roleTags = selectedRealmKeys.map(key => `<@&${config.realmsConfig[key].roleId}>`).join(' ');
+
+    let finalTitle;
+    if (realmNames.length === 1) {
+      finalTitle = realmNames[0];
+    } else if (realmNames.length === 2) {
+      finalTitle = realmNames.join(' & ');
+    } else {
+      finalTitle = `${realmNames.slice(0, -1).join(', ')}, & ${realmNames.slice(-1)}`;
+    }
+    
+    const messageContent = `## ${finalTitle}\n${data.text}\n\n${roleTags}`;
+    
+    const messageOptions = {
+      content: messageContent,
+    };
+
+    if (data.imageUrl) {
+      messageOptions.files = [data.imageUrl];
+    }
+
+    await targetChannel.send(messageOptions);
+
+    changelogDataStore.delete(interaction.user.id);
+    await interaction.editReply({ content: `✅ Changelog berhasil dikirim untuk **${finalTitle}**!`, components: [] });
+  }
 }
 
 async function handleButton(interaction) {
@@ -214,6 +298,8 @@ module.exports = {
       await handleChatInputCommand(interaction);
     } else if (interaction.isModalSubmit()) {
       await handleModalSubmit(interaction);
+    } else if (interaction.isStringSelectMenu()) {
+      await handleSelectMenu(interaction);
     } else if (interaction.isButton()) {
       await handleButton(interaction);
     }

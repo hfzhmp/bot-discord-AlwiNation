@@ -3,6 +3,41 @@
   "guildId": "1327298532826415206",
   "notificationChannelId": "1392130579729875045",
   "maintenanceChannelId": "1393174278018433105",
+  "changelogChannelId": "1393174278018433105",
+  "realmsConfig": {
+    "earthsmp-1": {
+      "name": "EarthSMP-1",
+      "roleId": "1338032006944129025"
+    },
+    "earthsmp-2": {
+      "name": "EarthSMP-2",
+      "roleId": "1351294517126500503"
+    },
+    "survival-1": {
+      "name": "Survival-1",
+      "roleId": "1338031887234633789"
+    },
+    "survival-2": {
+      "name": "Survival-2",
+      "roleId": "1388453838079524884"
+    },
+    "skyblock":{
+      "name": "SkyBlock",
+      "roleId": "1338032205594624052"
+    },
+    "oneblock":{
+      "name": "OneBlock",
+      "roleId": "1338032096832131123"
+    },
+    "caveblock":{
+      "name": "CaveBlock",
+      "roleId": "1385210521745358968"
+    },
+    "vanilla":{
+      "name": "Vanilla",
+      "roleId": "1338030766231388191"
+    }
+  },
   "allowedRoleIds": [
     "1327298533690179680", { "_note": "Owner" },
     "1331961946563416116", { "_note": "Supervisor" },

@@ -88,8 +88,8 @@ module.exports = {
         await message.channel.send({
           content: `## <:warning:1353853707929780244> Jika kamu lupa password akunmu, silakan ikuti langkah-langkah berikut: \n > - Ambil screenshot tab saat diminta memasukkan password. \n > - Ambil screenshot dari client yang kamu gunakan (misalnya, TLauncher). \n > - Jika ada, berikan bukti tambahan seperti screenshot saat kamu bermain di server. \nPastikan semua bukti yang dikirim jelas agar permintaan reset password bisa diproses dengan cepat!`,
           files: [{
-            attachment: 'https://media.discordapp.net/attachments/1327346272855916686/1392118290943316059/image.png?ex=687d87f0&is=687c3670&hm=909eab8af3b433e8a4428161d0d76dbd4b59d1dd3ee5239c9cae09303605cfe5&=&format=webp&quality=lossless&width=466&height=124',
-			name: 'forget_password.png'
+            attachment: 'https://cdn.discordapp.com/attachments/1327346272855916686/1397628213966012616/image.png',
+			      name: 'forget_password.png'
           }]
         });
       } else if(command === 'ptm'){ // Instruksi Top Up
