@@ -88,7 +88,7 @@ module.exports = {
         await message.channel.send({
           content: `## <:warning:1353853707929780244> Jika kamu lupa password akunmu, silakan ikuti langkah-langkah berikut: \n > - Ambil screenshot tab saat diminta memasukkan password. \n > - Ambil screenshot dari client yang kamu gunakan (misalnya, TLauncher). \n > - Jika ada, berikan bukti tambahan seperti screenshot saat kamu bermain di server. \nPastikan semua bukti yang dikirim jelas agar permintaan reset password bisa diproses dengan cepat!`,
           files: [{
-            attachment: 'https://cdn.discordapp.com/attachments/1327346272855916686/1397628213966012616/image.png',
+            attachment: 'https://i.postimg.cc/43r5qMFQ/forgetpassword.png',
 			      name: 'forget_password.png'
           }]
         });
