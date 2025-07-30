@@ -40,7 +40,8 @@
       "roleId": "1338030766231388191"
     },
     "global":{
-      "name": "Global"
+      "name": "Global",
+      "roleId": "1327298532826415212"
     }
   },
   "allowedRoleIds": [
