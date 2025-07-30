@@ -1,5 +1,8 @@
 const { Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, EmbedBuilder, MessageFlags, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../config.json');
+const fs = require('fs').promises;
+const path = require('path');
+const ongoingTicketsPath = path.join(__dirname, '../../ongoing_tickets.json');
 
 async function handleChatInputCommand(interaction) {
   const command = interaction.client.commands.get(interaction.commandName);
@@ -171,6 +174,42 @@ async function handleModalSubmit(interaction) {
       components: [row],
     });
   }
+
+  else if (interaction.customId.startsWith('ongoingTicketModal_')) {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+
+    try {
+      const selectedRealm = interaction.customId.split('_')[1];
+      const realmName = config.realmsConfig[selectedRealm]?.name || 'Tidak Diketahui';
+
+      const kategori = interaction.fields.getTextInputValue('kategori');
+      const deskripsi = interaction.fields.getTextInputValue('deskripsi');
+
+      const data = await fs.readFile(ongoingTicketsPath, 'utf8');
+      const tickets = JSON.parse(data);
+
+      if (tickets.some(ticket => ticket.channel_id === interaction.channelId)) {
+        return interaction.editReply({ content: 'Tiket ini sudah ditandai sebagai "berlangsung".' });
+      }
+
+      const newTicket = {
+        channel_id: interaction.channelId,
+        realm_name: realmName,
+        category: kategori,
+        description: deskripsi,
+        added_by: interaction.user.id,
+        added_at: new Date().toISOString()
+      };
+
+      tickets.push(newTicket);
+      await fs.writeFile(ongoingTicketsPath, JSON.stringify(tickets, null, 2));
+
+      await interaction.editReply({ content: `✅ Tiket untuk realm **${realmName}** telah ditandai sebagai "berlangsung".` });
+    } catch (error) {
+      console.error("Gagal menyimpan tiket ongoing:", error);
+      await interaction.editReply({ content: 'Terjadi error saat menyimpan data tiket.' });
+    }
+  }
 }
 
 async function handleSelectMenu(interaction) {
@@ -215,6 +254,61 @@ async function handleSelectMenu(interaction) {
 
     changelogDataStore.delete(interaction.user.id);
     await interaction.editReply({ content: `✅ Changelog berhasil dikirim untuk **${finalTitle}**!`, components: [] });
+  }
+  else if (interaction.customId === 'ongoing_realm_select') {
+    const selectedRealm = interaction.values[0];
+    
+    const modal = new ModalBuilder()
+      .setCustomId(`ongoingTicketModal_${selectedRealm}`) 
+      .setTitle('Formulir Tiket Berlangsung');
+
+    const kategoriInput = new TextInputBuilder()
+      .setCustomId('kategori')
+      .setLabel("Kategori Tiket")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Contoh: Lupa Password, Top Up, Bug')
+      .setRequired(true);
+
+    const deskripsiInput = new TextInputBuilder()
+      .setCustomId('deskripsi')
+      .setLabel("Deskripsi Singkat Masalah")
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('Jelaskan masalah utama tiket ini...')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(kategoriInput),
+      new ActionRowBuilder().addComponents(deskripsiInput)
+    );
+
+    await interaction.showModal(modal);
+  }
+  else if (interaction.customId === 'ongoing_ticket_delete_select') {
+    await interaction.deferUpdate({ flags: [MessageFlags.Ephemeral] });
+
+    try {
+      const channelIdToDelete = interaction.values[0];
+
+      const data = await fs.readFile(ongoingTicketsPath, 'utf8');
+      let tickets = JSON.parse(data);
+
+      const updatedTickets = tickets.filter(ticket => ticket.channel_id !== channelIdToDelete);
+
+      if (tickets.length === updatedTickets.length) {
+        return interaction.editReply({ content: 'Tiket yang dipilih tidak lagi ada di dalam daftar.', components: [] });
+      }
+
+      await fs.writeFile(ongoingTicketsPath, JSON.stringify(updatedTickets, null, 2));
+
+      await interaction.editReply({
+        content: '✅ Tiket telah berhasil dihapus dari daftar "on-going".',
+        components: []
+      });
+
+    } catch (error) {
+      console.error("Gagal menghapus tiket ongoing:", error);
+      await interaction.editReply({ content: 'Terjadi error saat mencoba menghapus tiket.', components: [] });
+    }
   }
 }
 

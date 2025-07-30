@@ -4,6 +4,8 @@
   "notificationChannelId": "1392130579729875045",
   "maintenanceChannelId": "1393174278018433105",
   "changelogChannelId": "1393174278018433105",
+  "recapChannelId": "1348986090064973896",
+  "recapTime": "00:00",
   "realmsConfig": {
     "earthsmp-1": {
       "name": "EarthSMP-1",

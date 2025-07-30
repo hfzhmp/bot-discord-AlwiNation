@@ -1,10 +1,11 @@
-const { Events } = require('discord.js');
+const { Events, ActivityType, EmbedBuilder } = require('discord.js');
 const mc = require('node-mcstatus');
 const fs = require('fs').promises;
 const path = require('path');
 const ads = require('../../ads.json');
 const config = require('../../config.json');
 const announcerConfig = config.announcer_config;
+const { sendOngoingRecap } = require('../utils/recapManager.js');
 
 const stateFilePath = path.join(__dirname, '../../state.json');
 
@@ -101,5 +102,33 @@ module.exports = {
 
     console.log('[Announcer] Mesin announcer iklan telah diaktifkan.');
     setInterval(announcerTick, 60000);
+
+    const scheduleRecap = () => {
+      const [hours, minutes] = config.recapTime.split(':');
+
+      const now = new Date();
+      const targetTime = new Date();
+      
+      targetTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      
+      const nowInWIB = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+      const targetInWIB = new Date(targetTime.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+
+      let delay = targetInWIB.getTime() - nowInWIB.getTime();
+
+      if (delay < 0) {
+        delay += 24 * 60 * 60 * 1000; // Tambah 24 jam
+      }
+      
+      console.log(`[Recap] Rekap tiket berikutnya dijadwalkan dalam ${Math.round(delay/1000/60)} menit.`);
+      
+      setTimeout(() => {
+        sendOngoingRecap(client); 
+        setInterval(sendOngoingRecap(client), 24 * 60 * 60 * 1000); 
+      }, delay);
+    };
+
+    scheduleRecap();
+    console.log('[Recap] Penjadwal rekap tiket harian telah aktif.');
   },
 };
