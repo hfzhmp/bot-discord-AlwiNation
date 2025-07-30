@@ -5,7 +5,7 @@
   "maintenanceChannelId": "1393174278018433105",
   "changelogChannelId": "1393174278018433105",
   "recapChannelId": "1348986090064973896",
-  "recapTime": "00:00",
+  "recapTime": "20:30",
   "realmsConfig": {
     "earthsmp-1": {
       "name": "EarthSMP-1",
@@ -38,6 +38,9 @@
     "vanilla":{
       "name": "Vanilla",
       "roleId": "1338030766231388191"
+    },
+    "global":{
+      "name": "Global"
     }
   },
   "allowedRoleIds": [
