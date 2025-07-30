@@ -45,7 +45,9 @@ async function sendOngoingRecap(client) {
       .setTimestamp()
       .setFooter({ text: "Mohon segera selesaikan tiket yang tertunda." });
 
-    await recapChannel.send({ embeds: [embed] });
+    await recapChannel.send({ 
+      content: "<@1327298533690179675>",
+      embeds: [embed] });
     console.log(`[Recap] Berhasil mengirim rekap untuk ${tickets.length} tiket.`);
     return { success: true, message: `Rekap berhasil dikirim ke channel <#${recapChannel.id}>.` };
     
