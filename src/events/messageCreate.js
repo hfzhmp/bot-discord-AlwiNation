@@ -3,7 +3,7 @@ const config = require('../../config.json');
 const { hasRequiredRole } = require('../utils/permissions');
 
 // prefix
-const prefix = '!';
+const prefix = '&';
 
 // Fungsi Pengecekan Staff Permission
 async function checkStaffPermission(message) {
@@ -32,11 +32,24 @@ async function getTicketCreator(message) {
       if (memberById) return memberById;
     }
 
-    // By Username
+    // By Username (Strict)
     const memberByUsername = message.guild.members.cache.find(member =>
       member.user.username === identifier
     );
     if (memberByUsername) return memberByUsername;
+
+    // By Normalized Username (Fuzzy)
+    // Discord channels: lowercase, spaces -> dashes, special chars removed usually
+    const memberByNormalized = message.guild.members.cache.find(member => {
+      // Simple normalization: verify if user's username lowercased + spaces-to-dashes matches identifier
+      const normalized = member.user.username.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
+      // Also check display name just in case
+      const normalizedDisplay = member.displayName.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
+      
+      return normalized === identifier || normalizedDisplay === identifier;
+    });
+    
+    if (memberByNormalized) return memberByNormalized;
 
     const fetchedMembers = await message.guild.members.fetch({
       query: identifier,
@@ -55,7 +68,7 @@ module.exports = {
   async execute(message) {
     if (message.author.bot || !message.content.startsWith(prefix)) return;
 
-    await message.delete();
+    await message.delete().catch(console.error); 
     if (!await checkStaffPermission(message)) return; 
     
     // Parsing perintah

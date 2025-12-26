@@ -7,16 +7,16 @@ const stateFilePath = path.join(__dirname, '../../../state.json');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ads')
-    .setDescription('Mengelola announcer iklan otomatis.')
+    .setDescription('[Staff] Mengelola announcer iklan otomatis.')
     .addSubcommand(subcommand =>
       subcommand
         .setName('on')
-        .setDescription('Mengaktifkan announcer iklan otomatis.')
+        .setDescription('[Staff] Mengaktifkan announcer iklan otomatis.')
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('off')
-        .setDescription('Menonaktifkan announcer iklan otomatis.')
+        .setDescription('[Staff] Menonaktifkan announcer iklan otomatis.')
     ),
   
   async execute(interaction) {

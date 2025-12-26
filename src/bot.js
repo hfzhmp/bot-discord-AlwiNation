@@ -27,4 +27,15 @@ for (const file of handlerFiles) {
 }
 
 // 5. Login menggunakan token dari .env
+// 5. Login menggunakan token dari .env
 client.login(process.env.DISCORD_TOKEN);
+
+// 6. Global Error Handlers (Mencegah Bot Crash)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[AntiChase] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Optional: Kirim notifikasi ke admin di Discord jika perlu
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[AntiCrash] Uncaught Exception:', error);
+});

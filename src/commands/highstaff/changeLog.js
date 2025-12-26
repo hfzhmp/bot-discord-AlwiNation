@@ -3,7 +3,7 @@ const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, Act
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('changelog')
-    .setDescription('Membuat catatan changelog baru untuk server/realms.')
+    .setDescription('[Staff] Membuat catatan changelog baru untuk server/realms.')
     .addAttachmentOption(option =>
       option.setName('gambar') // Opsional
         .setDescription('Lampirkan gambar opsional untuk changelog ini.')
@@ -22,8 +22,17 @@ module.exports = {
       .setPlaceholder("Gunakan '-' untuk membuat daftar poin.\n- Menambahkan item baru A\n- Memperbaiki bug B")
       .setRequired(true);
 
-    const actionRow = new ActionRowBuilder().addComponents(changelogInput);
-    modal.addComponents(actionRow);
+    const noteInput = new TextInputBuilder()
+      .setCustomId('noteText')
+      .setLabel("Catatan (opsional)")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("Misalnya: 'Perbaikan kecil pada server X'")
+      .setRequired(false);
+
+    const firstRow = new ActionRowBuilder().addComponents(changelogInput);
+    const secondRow = new ActionRowBuilder().addComponents(noteInput);
+
+    modal.addComponents(firstRow, secondRow);
 
     await interaction.showModal(modal);
   },

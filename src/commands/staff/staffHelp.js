@@ -4,7 +4,7 @@ const { createBaseEmbed } = require('../../utils/embedTemplates');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('staffhelp')
-    .setDescription('Menampilkan daftar perintah untuk staff AlwiNation.'),
+    .setDescription('[Staff] Menampilkan daftar perintah untuk staff AlwiNation.'),
     
   async execute(interaction) {
 
@@ -19,6 +19,7 @@ module.exports = {
       '`/map` - Menampilkan link peta EarthSMP.',
       '`/vote` - Menampilkan link untuk vote server.',
       '`/store` - Menampilkan link dan informasi web store.',
+      '`/report` - Melaporkan staff yang abuse atau melanggar aturan.',
       '### <:NPC:1353870504280326205> Perintah Staff (Prefix `!`)',
       '`!w` - Memberi peringatan pada tiket.',
       '`!c` - Menandai tiket akan ditutup.',

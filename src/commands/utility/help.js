@@ -18,7 +18,8 @@ module.exports = {
       '`/status` - Menampilkan status server Minecraft.',
       '`/map` - Menampilkan link peta EarthSMP.',
       '`/vote` - Menampilkan link untuk vote server.',
-      '`/store` - Menampilkan link dan informasi web store.'
+      '`/store` - Menampilkan link dan informasi web store.',
+      '`/report` - Melaporkan staff yang abuse atau melanggar aturan.'
     ].join('\n');
 
     const embed = createBaseEmbed().setDescription(description);

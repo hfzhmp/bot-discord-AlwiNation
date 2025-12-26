@@ -50,7 +50,6 @@ async function sendOngoingRecap(client) {
       embeds: [embed] });
     console.log(`[Recap] Berhasil mengirim rekap untuk ${tickets.length} tiket.`);
     return { success: true, message: `Rekap berhasil dikirim ke channel <#${recapChannel.id}>.` };
-    
   } catch (error) {
     console.error("[Recap] Gagal menjalankan rekap tiket:", error);
     return { success: false, message: 'Gagal mengirim rekap.' };

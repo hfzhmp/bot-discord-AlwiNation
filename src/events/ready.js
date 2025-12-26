@@ -1,7 +1,7 @@
 const { Events, ActivityType, EmbedBuilder } = require('discord.js');
 const mc = require('node-mcstatus');
-const fs = require('fs').promises;
 const path = require('path');
+const jsonDb = require('../utils/jsonDb');
 const ads = require('../../ads.json');
 const config = require('../../config.json');
 const announcerConfig = config.announcer_config;
@@ -41,14 +41,18 @@ module.exports = {
 
     const announcerTick = async () => {
       try {
-        const stateData = await fs.readFile(stateFilePath, 'utf8');
-        const state = JSON.parse(stateData);
+        const state = await jsonDb.read(stateFilePath, { ads_active: true, current_ad_index: 0 });
         if (!state.ads_active) {
           return;
         }
 
-        const now = new Date();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        // Force Jakarta Timezone
+        const currentTime = new Date().toLocaleTimeString('en-GB', { 
+            timeZone: 'Asia/Jakarta', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false
+        });
         
         if (!announcerConfig.schedule_times.includes(currentTime)) {
           return;
@@ -82,9 +86,10 @@ module.exports = {
 
         const nextIndex = (state.current_ad_index + 1) % ads.length;
         
-        state.current_ad_index = nextIndex;
-        
-        await fs.writeFile(stateFilePath, JSON.stringify(state, null, 2));
+        await jsonDb.update(stateFilePath, (s) => {
+          s.current_ad_index = nextIndex;
+          return s;
+        }, state);
 
         setTimeout(() => {
           sentMessage.delete().catch(error => {
@@ -124,7 +129,9 @@ module.exports = {
       
       setTimeout(() => {
         sendOngoingRecap(client); 
-        setInterval(sendOngoingRecap(client), 24 * 60 * 60 * 1000); 
+        setInterval(() => {
+          sendOngoingRecap(client);
+        }, 24 * 60 * 60 * 1000);
       }, delay);
     };
 

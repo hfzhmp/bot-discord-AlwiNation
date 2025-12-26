@@ -1,6 +1,7 @@
+const { MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { hasRequiredRole } = require('../utils/permissions.js');
+const { hasRequiredRole, hasHighStaffRole } = require('../utils/permissions.js');
 
 module.exports = (client) => {
   const commandsPath = path.join(__dirname, '..', 'commands');
@@ -26,7 +27,19 @@ module.exports = (client) => {
                 if (!hasRequiredRole(interaction.member)) {
                   return interaction.reply({
                     content: 'Hanya anggota staff yang dapat menggunakan perintah ini.',
-                    ephemeral: true,
+                    flags: [MessageFlags.Ephemeral]
+                  });
+                }
+                await originalExecute(interaction);
+              };
+            }
+            if (itemName === 'highstaff') {
+              const originalExecute = command.execute;
+              command.execute = async (interaction) => {
+                if (!hasHighStaffRole(interaction.member)) {
+                  return interaction.reply({
+                    content: 'Hanya high staff yang dapat menggunakan perintah ini.',
+                    flags: [MessageFlags.Ephemeral]
                   });
                 }
                 await originalExecute(interaction);

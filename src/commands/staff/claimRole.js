@@ -5,10 +5,10 @@ module.exports = {
   // Definisi slash command
   data: new SlashCommandBuilder()
     .setName('claimrole')
-    .setDescription('Klaim atau lepas role notifikasi untuk staff AlwiNation.')
+    .setDescription('[Staff] Klaim atau lepas role notifikasi untuk staff AlwiNation.')
     .addStringOption(option =>
       option.setName('role')
-      .setDescription('Pilih role notifikasi yang ingin di-toggle.')
+      .setDescription('[Staff] Pilih role notifikasi yang ingin di-toggle.')
       .setRequired(true)
       .addChoices(
         { name: 'Problem Tickets', value: 'Problem' },

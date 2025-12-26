@@ -8,21 +8,21 @@ const { sendOngoingRecap } = require('../../utils/recapManager');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ongoing')
-    .setDescription('Recap tiket yang sedang berlangsung.')
+    .setDescription('[Staff] Recap tiket yang sedang berlangsung.')
     .addSubcommand(subcommand =>
       subcommand
         .setName('add')
-        .setDescription('Menambahkan tiket ke daftar on-going.')
+        .setDescription('[Staff] Menambahkan tiket ke daftar on-going.')
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('delete')
-        .setDescription('Hapus tiket dari daftar on-going.')
+        .setDescription('[Staff] Hapus tiket dari daftar on-going.')
     )
     .addSubcommand(subcommand =>
       subcommand
         .setName('kirim')
-        .setDescription('Mengirim rekap tiket on-going secara manual.')
+        .setDescription('[Staff] Mengirim rekap tiket on-going secara manual.')
     ),
   
   async execute(interaction) {

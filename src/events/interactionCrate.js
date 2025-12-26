@@ -1,8 +1,20 @@
 const { Events, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, EmbedBuilder, MessageFlags, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const config = require('../../config.json');
-const fs = require('fs').promises;
+const { createBaseEmbed } = require('../utils/embedTemplates');
 const path = require('path');
+const jsonDb = require('../utils/jsonDb');
 const ongoingTicketsPath = path.join(__dirname, '../../ongoing_tickets.json');
+const pendingBugsPath = path.join(__dirname, '../../pending_bugs.json');
+
+const { randomUUID } = require('crypto');
+const bugReportStore = new Map();
+// const pendingBugReports = new Map(); // Replaced with persistent storage
+const { addBugToSheet } = require('../utils/googleSheets');
+
+const changelogDataStore = new Map();
+const reportDataStore = new Map();
+
+const HIGH_STAFF_ROLE_ID = '1327298533690179679';
 
 async function handleChatInputCommand(interaction) {
   const command = interaction.client.commands.get(interaction.commandName);
@@ -17,6 +29,31 @@ async function handleChatInputCommand(interaction) {
     changelogDataStore.set(interaction.user.id, { 
       text: null, 
       imageUrl: attachment ? attachment.url : null 
+    });
+  }
+  if (command.data.name === 'report') {
+    const attachment = interaction.options.getAttachment('gambar');
+    reportDataStore.set(interaction.user.id, { 
+      text: null, 
+      imageUrl: attachment ? attachment.url : null 
+    });
+  }
+
+  if (command.data.name === 'bugreport') {
+    const imageUrls = [];
+    for (let i = 1; i <= 3; i++) {
+      const attachment = interaction.options.getAttachment(`gambar-${i}`);
+      if (attachment) {
+        imageUrls.push(attachment.url);
+      }
+    }
+    
+    bugReportStore.set(interaction.user.id, {
+      imageUrls: imageUrls,
+      realms: [],
+      priority: null,
+      title: null,
+      description: null
     });
   }
 
@@ -34,20 +71,32 @@ async function handleChatInputCommand(interaction) {
 
 async function handleModalSubmit(interaction) {
   if (interaction.customId === 'maintenanceModal') {
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] }); 
+
+    const adminChannel = await interaction.client.channels.fetch(config.adminChatChannelId);
+
+    if (!adminChannel) {
+      return interaction.editReply({ 
+        content: 'Error: Channel Admin Chat tidak ditemukan di konfigurasi.', 
+      });
+    }
 
     try {
       const realmsName = interaction.fields.getTextInputValue('realmsName');
       const timeSchedule = interaction.fields.getTextInputValue('timeSchedule');
       const reasonMaintenance = interaction.fields.getTextInputValue('reasonMaintenance');
       const detailsMaintenance = interaction.fields.getTextInputValue('detailsMaintenance');
+      const maker = interaction.member.displayName;
+      const makerId = interaction.user.id;
 
       const targetChannel = await interaction.client.channels.fetch(config.maintenanceChannelId);
       if (!targetChannel) {
-        return interaction.editReply({ content: 'Error: Channel maintenance tidak ditemukan.' });
+        return interaction.editReply({ 
+          content: 'Error: Channel maintenance pengumuman tidak ditemukan.',
+        });
       }
 
-      const maintenanceEmbed = new EmbedBuilder()
+      const maintenanceEmbed = createBaseEmbed()
         .setColor('#FF7D29')
         .setDescription(
           `# <:warning:1353853707929780244> Pemberitahuan Maintenance Server\n` +
@@ -58,14 +107,10 @@ async function handleModalSubmit(interaction) {
           `\`\`\`${detailsMaintenance}\`\`\`\n` +
           `Selama proses maintenance berlangsung, **Realms tidak dapat diakses**. Kami mohon maaf atas ketidaknyamanan ini dan akan berusaha semaksimal mungkin untuk menyelesaikan proses maintenance secepatnya.\n\n` +
           `Terima kasih atas pengertiannya. <:heart_orange:1353875339645812806>`
-        )
-        .setFooter({
-          text: "—Tim AlwiNation",
-          iconURL: "https://media.discordapp.net/attachments/1327346272855916686/1394068883224133683/image.png?ex=68757752&is=687425d2&hm=eac7eceb40e7cdb4f4b9c47a2dc5c16a33f11d2c898e0bc160f0ae3fce127cc3&=&format=webp&quality=lossless&width=1244&height=1244"
-        });
+        );
 
       const announcementMessage = await targetChannel.send({
-        content: 'testing',
+        content: '@/everyone',
         embeds: [maintenanceEmbed]
       });
 
@@ -76,10 +121,27 @@ async function handleModalSubmit(interaction) {
       
       const row = new ActionRowBuilder().addComponents(doneButton);
 
-      await interaction.editReply({ 
-        content: '✅ Pengumuman maintenance darurat berhasil dikirim!',
+      const notificationEmbed = createBaseEmbed()
+        .setColor('#FF7D29')
+        .setDescription(
+          `## <:checkmark:1353853747725340813> Maintenance Status : On Going\n` +
+          `Maintenance mengenai "**${reasonMaintenance}**" berhasil dikirim!\n`+ 
+          `### <:redmessage:1418552581768347739>: ${announcementMessage.url}\n` +
+          `> By: ${maker} (<@${makerId}>)`
+        );
+
+      const confirmationMessage = await adminChannel.send({ 
+        embeds: [notificationEmbed],
         components: [row]
       });
+
+      if (interaction.channelId !== config.adminChatChannelId) {
+        await interaction.editReply({
+          content: `✅ Pengumuman berhasil dikirim! Pesan **Konfirmasi** (untuk menandai selesai) telah dikirim ${confirmationMessage.url}.`,
+        });
+      } else {
+        await interaction.deleteReply();
+      }
 
     } catch (error) {
       console.error('Error saat memproses modal maintenance:', error);
@@ -88,11 +150,21 @@ async function handleModalSubmit(interaction) {
   }
 
   else if (interaction.customId === 'emergencyMaintenanceModal') {
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] }); 
+
+    const adminChannel = await interaction.client.channels.fetch(config.adminChatChannelId);
+
+    if (!adminChannel) {
+      return interaction.editReply({ 
+        content: 'Error: Channel Admin Chat tidak ditemukan di konfigurasi.', 
+      });
+    }
 
     try {
       const realmsName = interaction.fields.getTextInputValue('realmsName');
       const reasonMaintenance = interaction.fields.getTextInputValue('reasonMaintenance');
+      const maker = interaction.member.displayName;
+      const makerId = interaction.user.id;
 
       const startTime = new Date().toLocaleTimeString('id-ID', {
         timeZone: 'Asia/Jakarta',
@@ -106,7 +178,7 @@ async function handleModalSubmit(interaction) {
         return interaction.editReply({ content: 'Error: Channel maintenance tidak ditemukan.' });
       }
 
-      const emergencyEmbed = new EmbedBuilder()
+      const emergencyEmbed = createBaseEmbed()
         .setColor('#DC2525') 
         .setDescription(
           `# <:warning:1353853707929780244> Pemberitahuan Emergency Maintenance\n` +
@@ -116,13 +188,9 @@ async function handleModalSubmit(interaction) {
           `Selama proses maintenance berlangsung, **Realms tidak dapat diakses**. Kami mohon maaf atas gangguan mendadak ini.\n\n` +
           `Terima kasih atas pengertiannya. <:heart_orange:1353875339645812806>`
         )
-        .setFooter({
-          text: "—Tim AlwiNation",
-          iconURL: "https://media.discordapp.net/attachments/1327346272855916686/1394068883224133683/image.png?ex=68757752&is=687425d2&hm=eac7eceb40e7cdb4f4b9c47a2dc5c16a33f11d2c898e0bc160f0ae3fce127cc3&=&format=webp&quality=lossless&width=1244&height=1244"
-        });
 
       const announcementMessage = await targetChannel.send({
-        content: 'testing',
+        content: '@/everyone',
         embeds: [emergencyEmbed]
       });
 
@@ -133,10 +201,28 @@ async function handleModalSubmit(interaction) {
       
       const row = new ActionRowBuilder().addComponents(doneButton);
 
-      await interaction.editReply({ 
-        content: '✅ Pengumuman maintenance darurat berhasil dikirim!',
+      const notificationEmbed = createBaseEmbed()
+        .setColor('#DC2525')
+        .setDescription(
+          `## <:checkmark:1353853747725340813> Maintenance Status : On Going\n` +
+          `Emergency Maintenance mengenai "**${reasonMaintenance}**" berhasil dikirim!\n`+ 
+          `### <:redmessage:1418552581768347739> ${announcementMessage.url}\n` +
+          `> By: ${maker} (<@${makerId}>)`
+
+        )
+
+      const confirmationMessage = await adminChannel.send({ 
+        embeds: [notificationEmbed],
         components: [row]
       });
+
+      if (interaction.channelId !== config.adminChatChannelId) {
+        await interaction.editReply({
+          content: `✅ Pengumuman berhasil dikirim! Pesan **Konfirmasi** (untuk menandai selesai) telah dikirim ${confirmationMessage.url}.`,
+        });
+      } else {
+        await interaction.deleteReply();
+      }
 
     } catch (error) {
       console.error('Error saat memproses modal maintenance darurat:', error);
@@ -153,6 +239,7 @@ async function handleModalSubmit(interaction) {
     }
     
     data.text = interaction.fields.getTextInputValue('changelogText');
+    data.note = interaction.fields.getTextInputValue('noteText');
     
     const realmOptions = Object.keys(config.realmsConfig).map(key => 
       new StringSelectMenuOptionBuilder()
@@ -175,6 +262,69 @@ async function handleModalSubmit(interaction) {
     });
   }
 
+  else if (interaction.customId === 'reportModal') {
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+
+    try{
+      const name = interaction.fields.getTextInputValue('name') || 'Anonim';
+      const staffUsername = interaction.fields.getTextInputValue('staffUsername');
+      const realm = interaction.fields.getTextInputValue('realm');
+      const detailDescription = interaction.fields.getTextInputValue('detailDescription')
+      const evidence = interaction.fields.getTextInputValue('evidence') || 'Tidak ada bukti.';
+      const data = reportDataStore.get(interaction.user.id);
+
+      const targetChannel = await interaction.client.channels.fetch(config.reportLogId);
+      if (!targetChannel) {
+        return interaction.editReply({ content: 'Error: Channel maintenance tidak ditemukan.' });
+      }
+
+      const messageContent = `# <:megaphone:1418541090235224074> — New Report!\n\n<@&${HIGH_STAFF_ROLE_ID}>`;
+      const reportEmbed = createBaseEmbed()
+        .setColor('#FF0000')
+        .setDescription(
+          `## <:rotating_light:1353870512450834443> Report Detail\n` +
+          `**Staff Username**: ${staffUsername}\n` +
+          `**Realms**: ${realm}\n` +
+          `### <:gforms:1353187627150606418> Deskripsi Laporan:\n` +
+          `${detailDescription}\n` +
+          `### <:redmessage:1418552581768347739> Bukti:\n` +
+          `\`\`\`${evidence}\`\`\`\n`
+        )
+        .addFields(
+          { name: '<:moyai:1353870495828803697> Pelapor', value: name, inline: true },
+          { name: '<:eyes:1353853762464256041> Name', value: interaction.member.displayName, inline: true },
+          { name: '<:discord:1353187631571275797> Discord', value: `<@${interaction.user.id}>`, inline: true }
+        )
+
+      await targetChannel.send({
+        content: messageContent,
+        embeds: [reportEmbed]
+      });
+
+      if (data && data.imageUrl) {
+        targetChannel.send({
+          content: "Bukti Gambar:",
+          files: [data.imageUrl]
+        })
+      }
+
+      reportDataStore.delete(interaction.user.id);
+      const successEmbed = createBaseEmbed()
+        .setColor('#57F287')
+        .setTitle('Laporan Terkirim')
+        .setDescription('Terima kasih, laporan Anda telah dikirim dan akan segera ditinjau oleh High Staff.');
+
+      await interaction.editReply({ embeds: [successEmbed] });
+    } catch (error) {
+      console.error("Gagal memproses laporan:", error);
+      const errorEmbed = createBaseEmbed()
+        .setColor('#FF0000')
+        .setTitle('❌ Terjadi Error')
+        .setDescription('Gagal mengirim laporan Anda ke tim kami karena ada masalah internal. Silakan hubungi admin secara langsung.');
+      await interaction.editReply({ embeds: [errorEmbed] });
+    }
+  }
+
   else if (interaction.customId.startsWith('ongoingTicketModal_')) {
     await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
@@ -185,30 +335,114 @@ async function handleModalSubmit(interaction) {
       const kategori = interaction.fields.getTextInputValue('kategori');
       const deskripsi = interaction.fields.getTextInputValue('deskripsi');
 
-      const data = await fs.readFile(ongoingTicketsPath, 'utf8');
-      const tickets = JSON.parse(data);
-
-      if (tickets.some(ticket => ticket.channel_id === interaction.channelId)) {
-        return interaction.editReply({ content: 'Tiket ini sudah ditandai sebagai "berlangsung".' });
-      }
-
-      const newTicket = {
-        channel_id: interaction.channelId,
-        realm_name: realmName,
-        category: kategori,
-        description: deskripsi,
-        added_by: interaction.user.id,
-        added_at: new Date().toISOString()
-      };
-
-      tickets.push(newTicket);
-      await fs.writeFile(ongoingTicketsPath, JSON.stringify(tickets, null, 2));
+      await jsonDb.update(ongoingTicketsPath, (tickets) => {
+        if (tickets.some(ticket => ticket.channel_id === interaction.channelId)) {
+          throw new Error('TIKET_ADA');
+        }
+        
+        const newTicket = {
+          channel_id: interaction.channelId,
+          realm_name: realmName,
+          category: kategori,
+          description: deskripsi,
+          added_by: interaction.user.id,
+          added_at: new Date().toISOString()
+        };
+        
+        tickets.push(newTicket);
+        return tickets;
+      }, []);
 
       await interaction.editReply({ content: `✅ Tiket untuk realm **${realmName}** telah ditandai sebagai "berlangsung".` });
     } catch (error) {
+      if (error.message === 'TIKET_ADA') {
+        return interaction.editReply({ content: 'Tiket ini sudah ditandai sebagai "berlangsung".' });
+      }
       console.error("Gagal menyimpan tiket ongoing:", error);
       await interaction.editReply({ content: 'Terjadi error saat menyimpan data tiket.' });
     }
+  }
+
+  else if (interaction.customId === 'bugreport_modal') {
+    await interaction.deferReply({ ephemeral: true });
+
+    const data = bugReportStore.get(interaction.user.id);
+    if (!data) {
+      return interaction.editReply({ content: 'Sesi Anda telah berakhir. Silakan mulai lagi.' });
+    }
+
+    data.title = interaction.fields.getTextInputValue('bugTitle');
+    data.description = interaction.fields.getTextInputValue('bugDescription');
+
+    bugReportStore.delete(interaction.user.id);
+
+    const bugId = randomUUID();
+
+    const completeBugData = {
+      ...data,
+      id: bugId,
+      reporterId: interaction.user.id,
+      reporterTag: interaction.user.tag,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Simpan ke storage persisten
+    await jsonDb.update(pendingBugsPath, (bugs) => {
+      bugs[bugId] = completeBugData;
+      return bugs;
+    }, {});
+    
+    const adminChannel = await interaction.client.channels.fetch(config.adminChatChannelId);
+
+    if (!adminChannel) {
+      return interaction.editReply({ 
+        content: 'Error: Channel Admin Chat tidak ditemukan di konfigurasi.', 
+      });
+    }
+
+    const realmNames = data.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
+    const priorityColors = { minor: '#00FF00', mayor: '#FFFF00', critical: '#FF0000' };
+    
+    const verificationEmbed = new EmbedBuilder()
+      .setColor(priorityColors[data.priority] || '#FFFFFF')
+      .setTitle(`Verifikasi Bug Report: ${data.title}`)
+      .setDescription(data.description)
+      .addFields(
+        { name: 'Pelapor', value: `<@${interaction.user.id}> (\`${interaction.user.tag}\`)`, inline: true },
+        { name: 'Realm(s)', value: realmNames, inline: true },
+        { name: 'Prioritas', value: data.priority, inline: true }
+      )
+      .setFooter({ text: `Bug ID: ${bugId}` })
+      .setTimestamp();
+    
+    if (data.imageUrls.length > 0) {
+      const imageLinks = data.imageUrls.map((url, i) => `[Gambar ${i+1}](${url})`).join('\n');
+      verificationEmbed.addFields({ name: 'Lampiran Gambar', value: imageLinks });
+    }
+
+    const approveButton = new ButtonBuilder()
+      .setCustomId(`bug_approve_${bugId}`)
+      .setLabel('Tambahkan ke List')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('✅');
+      
+    const rejectButton = new ButtonBuilder()
+      .setCustomId(`bug_reject_${bugId}`)
+      .setLabel('Tolak')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('❌');
+
+    const row = new ActionRowBuilder().addComponents(rejectButton, approveButton);
+
+    await adminChannel.send({
+      content: `<@&${HIGH_STAFF_ROLE_ID}>, ada laporan bug baru yang perlu diverifikasi.`,
+      embeds: [verificationEmbed],
+      components: [row]
+    });
+
+    await interaction.editReply({
+      content: '✅ Terima kasih! Laporan bug Anda telah dikirim ke tim Admin untuk diverifikasi.'
+    });
   }
 }
 
@@ -229,7 +463,7 @@ async function handleSelectMenu(interaction) {
     }
 
     const realmNames = selectedRealmKeys.map(key => config.realmsConfig[key].name);
-    const roleTags = selectedRealmKeys.map(key => `<@&${config.realmsConfig[key].roleId}>`).join(' ');
+    const roleTags = selectedRealmKeys.map(key => `<@&${config.realmsConfig[key].roleId}>`).join(` `);
 
     let finalTitle;
     if (realmNames.length === 1) {
@@ -240,10 +474,25 @@ async function handleSelectMenu(interaction) {
       finalTitle = `${realmNames.slice(0, -1).join(', ')}, & ${realmNames.slice(-1)}`;
     }
     
-    const messageContent = `## ${finalTitle}\n${data.text}\n\n${roleTags}`;
+    const messageContent = `# <:megaphone:1418541090235224074> — New Update!\n\n${roleTags}`;
+
+    const changelogEmbed = new EmbedBuilder()
+      .setColor('#29B0FF')
+      .setDescription(
+        `## <:cheese:1353853751282241670> Realm: ${finalTitle}\n` +
+        `### Changes:\n` +
+        `${data.text}` +
+        (data.note ? `\n**Note:**\n${data.note}` : '')
+      )
+      .setFooter({
+        text: `—Updated by ${interaction.member.displayName}`,
+        iconURL: `${interaction.user.displayAvatarURL()}`
+      })
+      .setTimestamp();
     
     const messageOptions = {
       content: messageContent,
+      embeds: [changelogEmbed]
     };
 
     if (data.imageUrl) {
@@ -289,16 +538,19 @@ async function handleSelectMenu(interaction) {
     try {
       const channelIdToDelete = interaction.values[0];
 
-      const data = await fs.readFile(ongoingTicketsPath, 'utf8');
-      let tickets = JSON.parse(data);
+      let found = false;
+      await jsonDb.update(ongoingTicketsPath, (tickets) => {
+        const initialLength = tickets.length;
+        const updatedTickets = tickets.filter(ticket => ticket.channel_id !== channelIdToDelete);
+        if (updatedTickets.length !== initialLength) {
+          found = true;
+        }
+        return updatedTickets;
+      }, []);
 
-      const updatedTickets = tickets.filter(ticket => ticket.channel_id !== channelIdToDelete);
-
-      if (tickets.length === updatedTickets.length) {
+      if (!found) {
         return interaction.editReply({ content: 'Tiket yang dipilih tidak lagi ada di dalam daftar.', components: [] });
       }
-
-      await fs.writeFile(ongoingTicketsPath, JSON.stringify(updatedTickets, null, 2));
 
       await interaction.editReply({
         content: '✅ Tiket telah berhasil dihapus dari daftar "on-going".',
@@ -310,11 +562,84 @@ async function handleSelectMenu(interaction) {
       await interaction.editReply({ content: 'Terjadi error saat mencoba menghapus tiket.', components: [] });
     }
   }
+
+  else if (interaction.customId === 'bugreport_realm_select') {
+    const data = bugReportStore.get(interaction.user.id);
+    if (!data) {
+      return interaction.update({ content: 'Sesi bug report Anda telah berakhir.', components: [], ephemeral: true });
+    }
+
+    data.realms = interaction.values;
+
+    const priorityMenu = new StringSelectMenuBuilder()
+      .setCustomId('bugreport_priority_select')
+      .setPlaceholder('Pilih tingkatan bug')
+      .addOptions(
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Minor')
+          .setDescription('Bug kecil, tidak mengganggu gameplay utama.')
+          .setValue('Minor')
+          .setEmoji('🟢'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Mayor')
+          .setDescription('Bug yang berdampak pada gameplay atau ekonomi.')
+          .setValue('Mayor')
+          .setEmoji('🟡'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Critical')
+          .setDescription('Bug yang merusak server, duplikasi, atau crash.')
+          .setValue('Critical')
+          .setEmoji('🔴')
+      );
+    
+    const row = new ActionRowBuilder().addComponents(priorityMenu);
+
+    await interaction.update({
+      content: 'Realm telah dipilih. Sekarang, pilih tingkatan prioritas bug:',
+      components: [row],
+      ephemeral: true
+    });
+  }
+  else if (interaction.customId === 'bugreport_priority_select') {
+    const data = bugReportStore.get(interaction.user.id);
+    if (!data) {
+      return interaction.update({ content: 'Sesi bug report Anda telah berakhir.', components: [], ephemeral: true });
+    }
+
+    data.priority = interaction.values[0];
+
+    const modal = new ModalBuilder()
+      .setCustomId('bugreport_modal')
+      .setTitle('Formulir Bug Report');
+
+    const titleInput = new TextInputBuilder()
+      .setCustomId('bugTitle')
+      .setLabel("Judul Bug Report")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Contoh: Duplikasi item di Realm Survival')
+      .setRequired(true);
+
+    const descriptionInput = new TextInputBuilder()
+      .setCustomId('bugDescription')
+      .setLabel("Deskripsi Bug")
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('Jelaskan cara agar bug ini terjadi...')
+      .setRequired(true);
+      
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(titleInput),
+      new ActionRowBuilder().addComponents(descriptionInput)
+    );
+
+    await interaction.showModal(modal);
+  }
+
 }
 
 async function handleButton(interaction) {
   if (interaction.customId.startsWith('maintenance_done_')) {
     await interaction.deferUpdate();
+    
 
     const parts = interaction.customId.split('_');
     const channelId = parts[2];
@@ -350,37 +675,141 @@ async function handleButton(interaction) {
       await originalMessage.edit({ embeds: [updatedEmbed] });
 
       // Buat pesan pemberitahuan selesai
-      const doneEmbed = new EmbedBuilder()
+      const doneEmbed = createBaseEmbed()
         .setColor('#06923E')
         .setDescription(
           `# <:sparkles:1353870538141073558> Maintenance Selesai\n` +
           `Proses maintenance telah selesai. Server atau realms yang terdampak kini sudah kembali **Online** dan dapat diakses seperti biasa.\n\n` +
           `Terima kasih atas kesabaran Anda!`
         )
-        .setFooter({ 
-          text: "—Tim AlwiNation",
-          iconURL: "https://media.discordapp.net/attachments/1327346272855916686/1394068883224133683/image.png?ex=68757752&is=687425d2&hm=eac7eceb40e7cdb4f4b9c47a2dc5c16a33f11d2c898e0bc160f0ae3fce127cc3&=&format=webp&quality=lossless&width=1244&height=1244"
-        })
-        .setTimestamp();
 
       await originalMessage.reply({
-        content: 'testing',
+        content: '@/everyone',
         embeds: [doneEmbed]
       });
 
-      await interaction.editReply({ 
-        content: 'Notifikasi "Selesai" telah terkirim.',
-        components: [] 
-      });
+      const finalNotificationEmbed = createBaseEmbed()
+        .setColor('#06923E')
+        .setDescription(
+          `## <:sparkles:1353870538141073558> Maintenance Status : Done\n` +
+          `Pemberitahuan "**Maintenance Selesai**" telah berhasil dikirim.\n`+ 
+          `### <:redmessage:1418552581768347739> ${originalMessage.url} \n` +
+          `> By: ${interaction.member.displayName} (<@${interaction.user.id}>)`
+        )
 
-      await interaction.followUp({
-          content: '✅ Berhasil mengirim pemberitahuan maintenance selesai!',
-          flags: [MessageFlags.Ephemeral]
+      await interaction.message.edit({
+        embeds: [finalNotificationEmbed],
+        components: []
       });
 
     } catch (error) {
       console.error('Error saat menangani tombol maintenance selesai:', error);
-      await interaction.followUp({ content: 'Gagal memproses. Pesan asli mungkin sudah dihapus.', ephemeral: true });
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'Gagal memproses. Pesan asli mungkin sudah dihapus.', flags: [MessageFlags.Ephemeral] });
+      } else {
+        await interaction.followUp({ content: 'Gagal memproses. Pesan asli mungkin sudah dihapus.', flags: [MessageFlags.Ephemeral] });
+      }
+    }
+  }
+  else if (interaction.customId === 'reportButton') {
+    const modal = new ModalBuilder()
+      .setCustomId('reportModal')
+      .setTitle('Formulir Report Staff');
+
+    const nameInput = new TextInputBuilder()
+      .setCustomId('name')
+      .setLabel("Nama Pelapor (Boleh Anonim)")
+      .setPlaceholder('Username / Anonim')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    const staffUsernameInput = new TextInputBuilder()
+      .setCustomId('staffUsername')
+      .setLabel("Username Staff")
+      .setPlaceholder('Username Staff yang Dilaporkan')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const realmInput = new TextInputBuilder()
+      .setCustomId('realm')
+      .setLabel("Realm")
+      .setPlaceholder('Realm tempat kejadian berlangsung')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const detailDescriptionInput = new TextInputBuilder()
+      .setCustomId('detailDescription')
+      .setLabel("Detail Laporan")
+      .setPlaceholder('Jelaskan detail deskripsi, waktu, dan lokasi kejadian secara rinci.')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true);
+
+    const evidenceInput = new TextInputBuilder()
+      .setCustomId('evidence')
+      .setLabel("Bukti Pendukung (Link/Gambar)")
+      .setPlaceholder('Link screenshot sebagai bukti. Gunakan command /report jika ingin melampirkan gambar tanpa link.')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(false);
+
+    const firstRow = new ActionRowBuilder().addComponents(nameInput);
+    const secondRow = new ActionRowBuilder().addComponents(staffUsernameInput);
+    const thirdRow = new ActionRowBuilder().addComponents(realmInput);
+    const fourthRow = new ActionRowBuilder().addComponents(detailDescriptionInput);
+    const fifthRow = new ActionRowBuilder().addComponents(evidenceInput);
+
+    modal.addComponents(firstRow, secondRow, thirdRow, fourthRow, fifthRow);
+
+    await interaction.showModal(modal);
+  }
+
+  else if (interaction.customId.startsWith('bug_reject_')) {
+    const bugId = interaction.customId.split('_')[2];
+    
+    await jsonDb.update(pendingBugsPath, (bugs) => {
+      delete bugs[bugId];
+      return bugs;
+    }, {});
+    
+    await interaction.message.delete();
+    
+  }
+
+  else if (interaction.customId.startsWith('bug_approve_')) {
+    await interaction.deferReply({ ephemeral: true });
+    const bugId = interaction.customId.split('_')[2];
+    
+    // Ambil data terbaru dari file
+    const allPendingBugs = await jsonDb.read(pendingBugsPath, {});
+    const bugData = allPendingBugs[bugId];
+
+    if (!bugData) {
+      return interaction.editReply({ content: 'Error: Bug report ini tidak lagi ada di daftar pending (mungkin sudah diproses).' });
+    }
+    
+    try {
+
+      await addBugToSheet(bugData);
+
+      await jsonDb.update(pendingBugsPath, (bugs) => {
+        delete bugs[bugId];
+        return bugs;
+      }, {});
+      
+      const originalEmbed = interaction.message.embeds[0];
+      const approvedEmbed = new EmbedBuilder(originalEmbed.toJSON())
+        .setColor('#57F287')
+        .setTitle(`[DISETUJUI] ${originalEmbed.title}`)
+        .setFooter({ text: `Disetujui oleh ${interaction.user.tag} | ID: ${bugId}` });
+        
+      await interaction.message.edit({
+        content: `Bug report ini telah disetujui oleh <@${interaction.user.id}> dan ditambahkan ke list.`,
+        embeds: [approvedEmbed],
+        components: []
+      });
+      
+    } catch (error) {
+      console.error("Gagal mengirim ke Google Sheets:", error);
+      await interaction.editReply({ content: 'Gagal mengirim data ke Google Sheets. Cek console.' });
     }
   }
 }

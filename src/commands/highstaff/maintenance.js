@@ -3,7 +3,7 @@ const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, Act
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('maintenance')
-    .setDescription('Membuat pengumuman maintenance server.'),
+    .setDescription('[Staff] Membuat pengumuman maintenance server.'),
 
   async execute(interaction) {
     const modal = new ModalBuilder()
