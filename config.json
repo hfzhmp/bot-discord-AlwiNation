@@ -1,47 +1,55 @@
 {
-  "clientId": "1353573911068938352",
-  "guildId": "1327298532826415206",
-  "notificationChannelId": "1392130579729875045",
+  "clientId": "1393051087547928576", 
+  "guildId": "1327298532826415206", 
+  "notificationChannelId": "1393174278018433105",
   "maintenanceChannelId": "1393174278018433105",
   "changelogChannelId": "1393174278018433105",
-  "recapChannelId": "1348986090064973896",
+  "recapChannelId": "1393174278018433105",
+  "panelReportId": "1393174278018433105",
+  "reportLogId": "1393174278018433105",
+  "googleSheetId": "1DpaZEunq0ptn72sRDt4sBqwT7k7MgF3f2LgfYAfmPV0",
+  "adminChatChannelId": "1327349717616693298",
   "recapTime": "20:30",
   "realmsConfig": {
-    "earthsmp-1": {
-      "name": "EarthSMP-1",
-      "roleId": "1338032006944129025"
-    },
-    "earthsmp-2": {
-      "name": "EarthSMP-2",
-      "roleId": "1351294517126500503"
+    "earthsmp": {
+      "name": "EarthSMP",
+      "roleId": "1338032006944129025",
+      "emoji": ""
     },
     "survival-1": {
       "name": "Survival-1",
-      "roleId": "1338031887234633789"
+      "roleId": "1338031887234633789",
+      "emoji": ""
     },
     "survival-2": {
       "name": "Survival-2",
-      "roleId": "1388453838079524884"
-    },
-    "skyblock":{
-      "name": "SkyBlock",
-      "roleId": "1338032205594624052"
-    },
-    "oneblock":{
-      "name": "OneBlock",
-      "roleId": "1338032096832131123"
+      "roleId": "1388453838079524884",
+      "emoji": ""
     },
     "caveblock":{
       "name": "CaveBlock",
-      "roleId": "1385210521745358968"
+      "roleId": "1385210521745358968",
+      "emoji": ""
     },
     "vanilla":{
-      "name": "Vanilla",
-      "roleId": "1338030766231388191"
+      "name": "Semi-Vanilla",
+      "roleId": "1338030766231388191",
+      "emoji": ""
+    },
+    "alwismp":{
+      "name": "AlwiSMP",
+      "roleId": "1419036643414900908",
+      "emoji": ""
     },
     "global":{
       "name": "Global",
-      "roleId": "1327298532826415212"
+      "roleId": "1327298532826415212",
+      "emoji": ""
+    },
+    "discord":{
+      "name": "Discord",
+      "roleId": "1327298532826415212",
+      "emoji": ""
     }
   },
   "allowedRoleIds": [
@@ -54,6 +62,15 @@
     "1346472562330308718", { "_note": "Moderator" },
     "1361314277331304530", { "_note": "S-Helper" },
     "1327298533690179675", { "_note": "Helper" },
+    "1348858283158540371", { "_note": "Affiliate Staff" }
+  ],
+  "highStaffRoleIds": [
+    "1327298533690179680", { "_note": "Owner" },
+    "1331961946563416116", { "_note": "Supervisor" },
+    "1327298533690179679", { "_note": "Administrator" },
+    "1328757971483754587", { "_note": "Developer" },
+    "1348555644705181696", { "_note": "Community Manager" },
+    "1368446736820998165", { "_note": "S-Moderator" },
     "1348858283158540371", { "_note": "Affiliate Staff" }
   ],
   "ticketConfig": {
@@ -69,7 +86,7 @@
     "Creator": "1392188965624348692"
   },
   "announcer_config": {
-    "channel_id": "1327298534369792065",
+    "channel_id": "1393174278018433105",
     "schedule_times": [
       "12:00",
       "15:00",
