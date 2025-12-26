@@ -1,6 +1,6 @@
 .gitignore
 node_modules
 .env
-config1.json
+config.json
 config-copy.json
 credentials.json
