@@ -137,5 +137,75 @@ module.exports = {
 
     scheduleRecap();
     console.log('[Recap] Penjadwal rekap tiket harian telah aktif.');
+
+    // --- Realm Status Updater ---
+    const updateRealmChannels = async () => {
+      // User uses 'realmsConfig' object in config.json
+      const realmConfig = config.realmsConfig;
+      
+      if (!realmConfig) {
+        console.warn('[RealmStatus] No realmsConfig configured in config.json');
+        return;
+      }
+
+      const realms = Object.values(realmConfig);
+
+      for (const realm of realms) {
+        // Skip if missing critical config (ip added by user manually)
+        if (!realm.channelId || !realm.ip) continue;
+
+        try {
+          const channel = await client.channels.fetch(realm.channelId);
+          if (!channel) {
+            console.warn(`[RealmStatus] Channel not found for realm: ${realm.name} (${realm.channelId})`);
+            continue;
+          }
+
+          try {
+            let host = realm.ip;
+            let port = realm.port || 25565;
+            
+            if (host.includes(':')) {
+              const parts = host.split(':');
+              host = parts[0];
+              port = parseInt(parts[1], 10);
+            }
+            
+            const response = await mc.statusJava(host, port);
+            
+            if (response.online) {
+              const playerCount = response.players.online;
+              const newName = `🟢・ᴏɴʟɪɴᴇ ${playerCount} ᴘʟᴀʏᴇʀꜱ`;
+              
+              if (channel.name !== newName) {
+                await channel.setName(newName);
+                console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName}`);
+              }
+            } else {
+              const newName = `🔴・ᴏꜰꜰʟɪɴᴇ`;
+              if (channel.name !== newName) {
+                await channel.setName(newName);
+                console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName}`);
+              }
+            }
+
+          } catch (err) {
+            const newName = `🔴・ᴏꜰꜰʟɪɴᴇ`;
+            if (channel.name !== newName) {
+              await channel.setName(newName);
+              console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName} (Query Failed)`);
+            }
+          }
+
+        } catch (error) {
+          console.error(`[RealmStatus] Error updating realm ${realm.name}:`, error);
+        }
+      }
+    };
+
+    // Run immediately and then every 6 minutes
+    updateRealmChannels();
+    setInterval(updateRealmChannels, 6 * 60 * 1000); 
+
   },
 };

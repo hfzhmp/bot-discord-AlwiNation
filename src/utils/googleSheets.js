@@ -20,10 +20,9 @@ async function addBugToSheet(bugData) {
   try {
     await doc.loadInfo();
     
-    // Cari sheet berdasarkan nama 'Bug Tracker' agar lebih aman jika tab digeser
+    // Cari sheet berdasarkan nama 'Bug Tracker'
     let sheet = doc.sheetsByTitle['Bug Tracker'];
     
-    // Fallback ke index 0 jika nama tidak ditemukan, tapi log warning
     if (!sheet) {
       console.warn("WARN: Sheet 'Bug Tracker' tidak ditemukan. Menggunakan sheet pertama (index 0).");
       sheet = doc.sheetsByIndex[0];
@@ -36,24 +35,56 @@ async function addBugToSheet(bugData) {
     // Ubah array realm keys menjadi nama
     const realmNames = bugData.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
 
-    // Tambahkan baris baru
-    // Pastikan nama properti di sini (e.g., 'ID', 'Judul')
-    // SAMA PERSIS dengan nama kolom header di Sheet Anda
-    await sheet.addRow({
-      'ID': bugData.id,
-      'Timestamp': bugData.timestamp,
-      'Pelapor': bugData.reporterTag,
-      'Judul': bugData.title,
-      'Deskripsi': bugData.description,
-      'Realm': realmNames,
-      'Prioritas': bugData.priority,
-      'Status': 'Berjalan', // Status awal saat disetujui
-      'Gambar': bugData.imageUrls.join('\n'), // Gabung semua link gambar
+    // Load cells untuk area kerja.
+    // Kita cek baris 6 sampai 200 (index 5 sampai 199).
+    // Kolom B (1) sampai K (10).
+    // B: No, C: Prioritas, D: Status, E: Waktu, F: Realm, G: Judul, H: Deskripsi, I: Bukti, J: Pelapor, K: ID
+    const START_ROW_INDEX = 5; // Baris 6
+    const CHECK_LIMIT = 200; // Cek sampai baris 200 + 6
+    
+    await sheet.loadCells({
+      startRowIndex: START_ROW_INDEX,
+      endRowIndex: START_ROW_INDEX + CHECK_LIMIT,
+      startColumnIndex: 1, // Kolom B
+      endColumnIndex: 11   // Sampai kolom L (eksklusif), jadi sampai K
     });
+
+    let targetRowIndex = -1;
+
+    // Loop cari baris kosong berdasarkan kolom Judul (G -> index 6)
+    for (let i = 0; i < CHECK_LIMIT; i++) {
+        const rowIndex = START_ROW_INDEX + i;
+        const titleCell = sheet.getCell(rowIndex, 6); // Kolom G (Judul)
+        
+        // Jika cell judul kosong, kita anggap baris ini kosong
+        if (!titleCell.value) {
+            targetRowIndex = rowIndex;
+            break;
+        }
+    }
+
+    if (targetRowIndex === -1) {
+        throw new Error("Sheet penuh atau tidak ada baris kosong ditemukan dalam range pencarian.");
+    }
+
+    // Tulis data ke baris yang ditemukan
+    const noUrut = targetRowIndex - START_ROW_INDEX + 1;
+
+    sheet.getCell(targetRowIndex, 1).value = noUrut; // B: No
+    sheet.getCell(targetRowIndex, 2).value = bugData.priority; // C: Prioritas
+    sheet.getCell(targetRowIndex, 3).value = 'Berjalan'; // D: Status
+    sheet.getCell(targetRowIndex, 4).value = bugData.timestamp; // E: Waktu
+    sheet.getCell(targetRowIndex, 5).value = realmNames; // F: Realm
+    sheet.getCell(targetRowIndex, 6).value = bugData.title; // G: Judul
+    sheet.getCell(targetRowIndex, 7).value = bugData.description; // H: Deskripsi
+    sheet.getCell(targetRowIndex, 8).value = bugData.imageUrls.join('\n'); // I: Bukti
+    sheet.getCell(targetRowIndex, 9).value = bugData.reporterTag; // J: Pelapor
+    sheet.getCell(targetRowIndex, 10).value = bugData.id; // K: ID
+
+    await sheet.saveUpdatedCells();
 
   } catch (error) {
     console.error('Gagal menambahkan baris ke Google Sheet:', error);
-    // Melempar error lagi agar bisa ditangkap oleh handler tombol
     throw error;
   }
 }

@@ -806,6 +806,8 @@ async function handleButton(interaction) {
         embeds: [approvedEmbed],
         components: []
       });
+
+      await interaction.editReply({ content: '✅ Laporan berhasil disetujui dan dicatat.' });
       
     } catch (error) {
       console.error("Gagal mengirim ke Google Sheets:", error);
