@@ -12,13 +12,15 @@ const stateFilePath = path.join(__dirname, '../../state.json');
 const serverAddress = 'play.alwination.id';
 const offlineStatus = 'Jangan Xray~';
 
+const newDate = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+
 module.exports = {
   name: Events.ClientReady,
   once: true,
   
   async execute(client) {
     console.log(`Bot telah login sebagai ${client.user.tag}!`);
-	  console.log(`Waktu aktif: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`);
+	  console.log(`Waktu aktif: ${newDate}`);
 
     const updatePlayerCountActivity = async () => {
       try {
@@ -179,13 +181,13 @@ module.exports = {
               
               if (channel.name !== newName) {
                 await channel.setName(newName);
-                console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName}`);
+                console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName} |${newDate}|`);
               }
             } else {
               const newName = `🔴・ᴏꜰꜰʟɪɴᴇ`;
               if (channel.name !== newName) {
                 await channel.setName(newName);
-                console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName}`);
+                console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName} |${newDate}|`);
               }
             }
 
@@ -193,12 +195,12 @@ module.exports = {
             const newName = `🔴・ᴏꜰꜰʟɪɴᴇ`;
             if (channel.name !== newName) {
               await channel.setName(newName);
-              console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName} (Query Failed)`);
+              console.log(`[RealmStatus] Updated ${realm.name} channel to: ${newName} (Query Failed) |${newDate}|`);
             }
           }
 
         } catch (error) {
-          console.error(`[RealmStatus] Error updating realm ${realm.name}:`, error);
+          console.error(`[RealmStatus] Error updating realm ${realm.name}:`, error, newDate);
         }
       }
     };

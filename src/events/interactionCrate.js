@@ -8,13 +8,14 @@ const pendingBugsPath = path.join(__dirname, '../../pending_bugs.json');
 
 const { randomUUID } = require('crypto');
 const bugReportStore = new Map();
-// const pendingBugReports = new Map(); // Replaced with persistent storage
 const { addBugToSheet } = require('../utils/googleSheets');
 
 const changelogDataStore = new Map();
 const reportDataStore = new Map();
 
-const HIGH_STAFF_ROLE_ID = '1327298533690179679';
+const ADMIN_ROLE_ID = '/1327298533690179679';
+const DEVELOPER_ROLE_ID = '/1328757971483754587';
+const EVERYONE = '@/everyone'
 
 async function handleChatInputCommand(interaction) {
   const command = interaction.client.commands.get(interaction.commandName);
@@ -25,24 +26,31 @@ async function handleChatInputCommand(interaction) {
   }
 
   if (command.data.name === 'changelog') {
-    const attachment = interaction.options.getAttachment('gambar');
-    changelogDataStore.set(interaction.user.id, { 
-      text: null, 
-      imageUrl: attachment ? attachment.url : null 
-    });
-  }
-  if (command.data.name === 'report') {
-    const attachment = interaction.options.getAttachment('gambar');
-    reportDataStore.set(interaction.user.id, { 
-      text: null, 
-      imageUrl: attachment ? attachment.url : null 
-    });
-  }
-
-  if (command.data.name === 'bugreport') {
     const imageUrls = [];
     for (let i = 1; i <= 3; i++) {
       const attachment = interaction.options.getAttachment(`gambar-${i}`);
+      if (attachment) imageUrls.push(attachment.url);
+    }
+    changelogDataStore.set(interaction.user.id, { 
+      text: null, 
+      imageUrls: imageUrls
+    });
+  }
+  if (command.data.name === 'report') {
+    const imageUrls = [];
+    for (let i = 1; i <= 3; i++) {
+        const attachment = interaction.options.getAttachment(`bukti-${i}`);
+        if (attachment) imageUrls.push(attachment.url);
+    }
+    reportDataStore.set(interaction.user.id, { 
+      text: null, 
+      imageUrls: imageUrls
+    });
+  }
+  if (command.data.name === 'bugreport') {
+    const imageUrls = [];
+    for (let i = 1; i <= 3; i++) {
+      const attachment = interaction.options.getAttachment(`bukti-${i}`);
       if (attachment) {
         imageUrls.push(attachment.url);
       }
@@ -60,6 +68,8 @@ async function handleChatInputCommand(interaction) {
   try {
     await command.execute(interaction);
   } catch (error) {
+    const fs = require('fs');
+    fs.appendFileSync('last_error.log', `${new Date().toISOString()} - [HANDLE_CMD] ${error.stack || error}\n`);
     console.error(`Error saat menjalankan command /${interaction.commandName}:`, error);
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp({ content: 'Terjadi error saat menjalankan perintah ini!', flags: [MessageFlags.Ephemeral] });
@@ -110,7 +120,7 @@ async function handleModalSubmit(interaction) {
         );
 
       const announcementMessage = await targetChannel.send({
-        content: '@/everyone',
+        content: EVERYONE,
         embeds: [maintenanceEmbed]
       });
 
@@ -190,7 +200,7 @@ async function handleModalSubmit(interaction) {
         )
 
       const announcementMessage = await targetChannel.send({
-        content: '@/everyone',
+        content: EVERYONE,
         embeds: [emergencyEmbed]
       });
 
@@ -278,7 +288,7 @@ async function handleModalSubmit(interaction) {
         return interaction.editReply({ content: 'Error: Channel maintenance tidak ditemukan.' });
       }
 
-      const messageContent = `# <:megaphone:1418541090235224074> — New Report!\n\n<@&${HIGH_STAFF_ROLE_ID}>`;
+      const messageContent = `# <:megaphone:1418541090235224074> — New Report!\n\n<@&${ADMIN_ROLE_ID}>`;
       const reportEmbed = createBaseEmbed()
         .setColor('#FF0000')
         .setDescription(
@@ -301,10 +311,10 @@ async function handleModalSubmit(interaction) {
         embeds: [reportEmbed]
       });
 
-      if (data && data.imageUrl) {
+      if (data && data.imageUrls && data.imageUrls.length > 0) {
         targetChannel.send({
           content: "Bukti Gambar:",
-          files: [data.imageUrl]
+          files: data.imageUrls
         })
       }
 
@@ -364,7 +374,7 @@ async function handleModalSubmit(interaction) {
   }
 
   else if (interaction.customId === 'bugreport_modal') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
     const data = bugReportStore.get(interaction.user.id);
     if (!data) {
@@ -401,25 +411,32 @@ async function handleModalSubmit(interaction) {
     }
 
     const realmNames = data.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
-    const priorityColors = { minor: '#00FF00', mayor: '#FFFF00', critical: '#FF0000' };
-    
+    const priorityMap = {
+      'Minor': { name: '🟢 Minor' },
+      'Mayor': { name: '🟡 Mayor' },
+      'Critical': { name: '🔴 Critical' }
+    };
+    const pStyle = priorityMap[data.priority] || { name: 'Unknown' };
+
     const verificationEmbed = new EmbedBuilder()
-      .setColor(priorityColors[data.priority] || '#FFFFFF')
-      .setTitle(`Verifikasi Bug Report: ${data.title}`)
-      .setDescription(data.description)
+      .setColor('#FF0000')
+      .setDescription(
+        `## <:rotating_light:1353870512450834443> Verification Bug Report Details\n` +
+        `**Judul**: ${data.title}\n` +
+        `**Realms**: ${realmNames}\n` +
+        `**Priority**: ${pStyle.name}\n` +
+        `### <:gforms:1353187627150606418> Deskripsi:\n` + 
+        `${data.description}`
+      )
       .addFields(
         { name: 'Pelapor', value: `<@${interaction.user.id}> (\`${interaction.user.tag}\`)`, inline: true },
-        { name: 'Realm(s)', value: realmNames, inline: true },
-        { name: 'Prioritas', value: data.priority, inline: true }
       )
-      .setFooter({ text: `Bug ID: ${bugId}` })
+      .setFooter({ 
+        text: `Bug ID: ${bugId}`,
+        iconURL: `${interaction.user.displayAvatarURL()}` 
+      })
       .setTimestamp();
     
-    if (data.imageUrls.length > 0) {
-      const imageLinks = data.imageUrls.map((url, i) => `[Gambar ${i+1}](${url})`).join('\n');
-      verificationEmbed.addFields({ name: 'Lampiran Gambar', value: imageLinks });
-    }
-
     const approveButton = new ButtonBuilder()
       .setCustomId(`bug_approve_${bugId}`)
       .setLabel('Tambahkan ke List')
@@ -430,19 +447,143 @@ async function handleModalSubmit(interaction) {
       .setCustomId(`bug_reject_${bugId}`)
       .setLabel('Tolak')
       .setStyle(ButtonStyle.Danger)
-      .setEmoji('❌');
+      .setEmoji('⚫');
 
-    const row = new ActionRowBuilder().addComponents(rejectButton, approveButton);
+    const editButton = new ButtonBuilder()
+      .setCustomId(`bug_edit_${bugId}`)
+      .setLabel('Edit')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('✏️');
+
+    const row = new ActionRowBuilder().addComponents(rejectButton, editButton, approveButton);
 
     await adminChannel.send({
-      content: `<@&${HIGH_STAFF_ROLE_ID}>, ada laporan bug baru yang perlu diverifikasi.`,
+      content: `# <:megaphone:1418541090235224074> — New Bug Report!\n\nSegera Verifikasi <@&${ADMIN_ROLE_ID}>.`,
       embeds: [verificationEmbed],
       components: [row]
     });
 
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      await adminChannel.send({
+        content: "Bukti:",
+        files: data.imageUrls
+      });
+    }
+
     await interaction.editReply({
       content: '✅ Terima kasih! Laporan bug Anda telah dikirim ke tim Admin untuk diverifikasi.'
     });
+  }
+
+  else if (interaction.customId.startsWith('bug_edit_modal_')) {
+    try {
+      await interaction.deferUpdate({ flags: [MessageFlags.Ephemeral] });
+    } catch (err) {
+      if (err.code === 10062) {
+        console.warn('[WARN] Interaction expired in bug_edit_modal_. Ignoring.');
+        return;
+      }
+      throw err;
+    }
+    
+    const bugId = interaction.customId.split('_')[3];
+    const newTitle = interaction.fields.getTextInputValue('editBugTitle');
+    const newDescription = interaction.fields.getTextInputValue('editBugDescription');
+
+    try {
+      // Update di storage persisten
+      let updatedBug;
+      await jsonDb.update(pendingBugsPath, (bugs) => {
+        if (bugs[bugId]) {
+          bugs[bugId].title = newTitle;
+          bugs[bugId].description = newDescription;
+          updatedBug = bugs[bugId];
+        }
+        return bugs;
+      }, {});
+
+      if (!updatedBug) {
+        return interaction.editReply({ content: 'Gagal update: Data bug tidak ditemukan.' });
+      }
+
+      // Reconstruct description
+      const realmNames = updatedBug.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
+      const priorityMap = {
+        'Minor': { name: '🟢 Minor' },
+        'Mayor': { name: '🟡 Mayor' },
+        'Critical': { name: '🔴 Critical' }
+      };
+      const pStyle = priorityMap[updatedBug.priority] || { name: 'Unknown' };
+
+      const fullDescription = 
+        `## <:rotating_light:1353870512450834443> Verification Bug Report Details\n` +
+        `**Judul**: ${updatedBug.title}\n` +
+        `**Realms**: ${realmNames}\n` +
+        `**Priority**: ${pStyle.name}\n` +
+        `### <:gforms:1353187627150606418> Deskripsi:\n` + 
+        `${updatedBug.description}`;
+
+      // Ambil embed lama dan update
+      const originalEmbed = interaction.message.embeds[0];
+      const updatedEmbed = new EmbedBuilder(originalEmbed.toJSON())
+        .setDescription(fullDescription); 
+
+      await interaction.message.edit({ embeds: [updatedEmbed] });
+      
+      const channelId = interaction.channelId;
+      const messageId = interaction.message.id;
+
+      const realmOptions = Object.keys(config.realmsConfig).map(key => 
+        new StringSelectMenuOptionBuilder()
+          .setLabel(config.realmsConfig[key].name)
+          .setValue(key)
+          .setDefault(updatedBug.realms.includes(key))
+      );
+
+      const realmMenu = new StringSelectMenuBuilder()
+        .setCustomId(`bug_edit_realm_${bugId}_${channelId}_${messageId}`)
+        .setPlaceholder('Ubah Realms')
+        .setMinValues(1)
+        .setMaxValues(realmOptions.length)
+        .addOptions(realmOptions);
+
+      const priorityMenu = new StringSelectMenuBuilder()
+        .setCustomId(`bug_edit_priority_${bugId}_${channelId}_${messageId}`)
+        .setPlaceholder('Ubah Prioritas')
+        .addOptions(
+          new StringSelectMenuOptionBuilder().setLabel('Minor').setValue('Minor').setEmoji('🟢').setDefault(updatedBug.priority === 'Minor'),
+          new StringSelectMenuOptionBuilder().setLabel('Mayor').setValue('Mayor').setEmoji('🟡').setDefault(updatedBug.priority === 'Mayor'),
+          new StringSelectMenuOptionBuilder().setLabel('Critical').setValue('Critical').setEmoji('🔴').setDefault(updatedBug.priority === 'Critical')
+        );
+
+      const row1 = new ActionRowBuilder().addComponents(realmMenu);
+      const row2 = new ActionRowBuilder().addComponents(priorityMenu);
+      
+      const doneButton = new ButtonBuilder()
+          .setCustomId('bug_edit_done')
+          .setLabel('Selesai Edit')
+          .setStyle(ButtonStyle.Success);
+          
+      const row3 = new ActionRowBuilder().addComponents(doneButton);
+
+      await interaction.followUp({ 
+        content: '✅ Judul & Deskripsi diperbarui. Anda juga dapat mengubah **Realms** dan **Prioritas** di bawah ini:',
+        components: [row1, row2, row3],
+        flags: [MessageFlags.Ephemeral] 
+      });
+
+    } catch (error) {
+      console.error('Gagal mengedit bug report:', error);
+      await interaction.followUp({ content: 'Gagal mengedit bug report.', flags: [MessageFlags.Ephemeral] });
+    }
+  }
+  
+  else if (interaction.customId === 'bug_edit_done') {
+      try {
+        await interaction.update({ content: '✅ Pengeditan selesai.', components: [] });
+      } catch (error) {
+        console.warn('Caught error in bug_edit_done:', error);
+      }
   }
 }
 
@@ -495,8 +636,8 @@ async function handleSelectMenu(interaction) {
       embeds: [changelogEmbed]
     };
 
-    if (data.imageUrl) {
-      messageOptions.files = [data.imageUrl];
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      messageOptions.files = data.imageUrls;
     }
 
     await targetChannel.send(messageOptions);
@@ -504,6 +645,7 @@ async function handleSelectMenu(interaction) {
     changelogDataStore.delete(interaction.user.id);
     await interaction.editReply({ content: `✅ Changelog berhasil dikirim untuk **${finalTitle}**!`, components: [] });
   }
+
   else if (interaction.customId === 'ongoing_realm_select') {
     const selectedRealm = interaction.values[0];
     
@@ -532,6 +674,7 @@ async function handleSelectMenu(interaction) {
 
     await interaction.showModal(modal);
   }
+
   else if (interaction.customId === 'ongoing_ticket_delete_select') {
     await interaction.deferUpdate({ flags: [MessageFlags.Ephemeral] });
 
@@ -564,76 +707,299 @@ async function handleSelectMenu(interaction) {
   }
 
   else if (interaction.customId === 'bugreport_realm_select') {
-    const data = bugReportStore.get(interaction.user.id);
-    if (!data) {
-      return interaction.update({ content: 'Sesi bug report Anda telah berakhir.', components: [], ephemeral: true });
-    }
-
-    data.realms = interaction.values;
-
-    const priorityMenu = new StringSelectMenuBuilder()
-      .setCustomId('bugreport_priority_select')
-      .setPlaceholder('Pilih tingkatan bug')
-      .addOptions(
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Minor')
-          .setDescription('Bug kecil, tidak mengganggu gameplay utama.')
-          .setValue('Minor')
-          .setEmoji('🟢'),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Mayor')
-          .setDescription('Bug yang berdampak pada gameplay atau ekonomi.')
-          .setValue('Mayor')
-          .setEmoji('🟡'),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Critical')
-          .setDescription('Bug yang merusak server, duplikasi, atau crash.')
-          .setValue('Critical')
-          .setEmoji('🔴')
-      );
-    
-    const row = new ActionRowBuilder().addComponents(priorityMenu);
-
-    await interaction.update({
-      content: 'Realm telah dipilih. Sekarang, pilih tingkatan prioritas bug:',
-      components: [row],
-      ephemeral: true
-    });
-  }
-  else if (interaction.customId === 'bugreport_priority_select') {
-    const data = bugReportStore.get(interaction.user.id);
-    if (!data) {
-      return interaction.update({ content: 'Sesi bug report Anda telah berakhir.', components: [], ephemeral: true });
-    }
-
-    data.priority = interaction.values[0];
-
-    const modal = new ModalBuilder()
-      .setCustomId('bugreport_modal')
-      .setTitle('Formulir Bug Report');
-
-    const titleInput = new TextInputBuilder()
-      .setCustomId('bugTitle')
-      .setLabel("Judul Bug Report")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Contoh: Duplikasi item di Realm Survival')
-      .setRequired(true);
-
-    const descriptionInput = new TextInputBuilder()
-      .setCustomId('bugDescription')
-      .setLabel("Deskripsi Bug")
-      .setStyle(TextInputStyle.Paragraph)
-      .setPlaceholder('Jelaskan cara agar bug ini terjadi...')
-      .setRequired(true);
+    try {
+      try {
+        await interaction.deferUpdate();
+      } catch (deferError) {
+        if (deferError.code === 10062) {
+          console.warn('[WARN] Interaction expired or unknown before deferUpdate could complete. Network lag?', deferError);
+          return;
+        }
+        throw deferError;
+      }
       
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(titleInput),
-      new ActionRowBuilder().addComponents(descriptionInput)
-    );
+      const data = bugReportStore.get(interaction.user.id);
+      if (!data) {
+        return interaction.editReply({ content: 'Sesi bug report Anda telah berakhir.', components: [] });
+      }
 
-    await interaction.showModal(modal);
+      data.realms = interaction.values;
+
+      const priorityMenu = new StringSelectMenuBuilder()
+        .setCustomId('bugreport_priority_select')
+        .setPlaceholder('Pilih tingkatan bug')
+        .addOptions(
+          new StringSelectMenuOptionBuilder()
+            .setLabel('Minor')
+            .setDescription('Bug kecil, tidak mengganggu gameplay utama.')
+            .setValue('Minor')
+            .setEmoji('🟢'),
+          new StringSelectMenuOptionBuilder()
+            .setLabel('Mayor')
+            .setDescription('Bug yang berdampak pada gameplay atau ekonomi.')
+            .setValue('Mayor')
+            .setEmoji('🟡'),
+          new StringSelectMenuOptionBuilder()
+            .setLabel('Critical')
+            .setDescription('Bug yang merusak server, duplikasi, atau crash.')
+            .setValue('Critical')
+            .setEmoji('🔴')
+        );
+      
+      const row = new ActionRowBuilder().addComponents(priorityMenu);
+
+      await interaction.editReply({
+        content: 'Realm telah dipilih. Sekarang, pilih tingkatan prioritas bug:',
+        components: [row]
+      });
+    } catch (error) {
+      console.error('Error in bugreport_realm_select:', error);
+      try {
+        if (!interaction.deferred && !interaction.replied) {
+          await interaction.reply({ content: 'Terjadi kesalahan saat memproses permintaan Anda.', flags: [MessageFlags.Ephemeral] });
+        } else {
+          await interaction.editReply({ content: 'Terjadi kesalahan saat memproses permintaan Anda.' });
+        }
+      } catch (e) {
+        // Ignore secondary error
+      }
+    }
   }
 
+  else if (interaction.customId === 'bugreport_priority_select') {
+    try {
+      const data = bugReportStore.get(interaction.user.id);
+      if (!data) {
+        return interaction.update({ content: 'Sesi bug report Anda telah berakhir.', components: [], flags: [MessageFlags.Ephemeral] });
+      }
+
+      data.priority = interaction.values[0];
+
+      const modal = new ModalBuilder()
+        .setCustomId('bugreport_modal')
+        .setTitle('Formulir Bug Report');
+
+      const titleInput = new TextInputBuilder()
+        .setCustomId('bugTitle')
+        .setLabel("Judul Bug Report")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Contoh: Duplikasi item di Realm Survival')
+        .setRequired(true);
+
+      const descriptionInput = new TextInputBuilder()
+        .setCustomId('bugDescription')
+        .setLabel("Deskripsi Bug")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Jelaskan cara agar bug ini terjadi...')
+        .setRequired(true);
+        
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(titleInput),
+        new ActionRowBuilder().addComponents(descriptionInput)
+      );
+
+      await interaction.showModal(modal);
+    } catch (error) {
+      console.error('[DEBUG] Error in bugreport_priority_select:', error);
+      try {
+        if (!interaction.deferred && !interaction.replied) {
+          await interaction.reply({ content: 'Terjadi error internal.', flags: [MessageFlags.Ephemeral] });
+        }
+      } catch (e) { }
+    }
+  }
+
+  else if (interaction.customId.startsWith('bug_edit_realm_')) {
+    await interaction.deferUpdate({ flags: [MessageFlags.Ephemeral] });
+    
+    const parts = interaction.customId.split('_');
+    const bugId = parts[3];
+    const channelId = parts[4];
+    const messageId = parts[5];
+    const newRealms = interaction.values;
+
+    try {
+      let updatedBug;
+      await jsonDb.update(pendingBugsPath, (bugs) => {
+        if (bugs[bugId]) {
+          bugs[bugId].realms = newRealms;
+          updatedBug = bugs[bugId];
+        }
+        return bugs;
+      }, {});
+
+      if (!updatedBug) {
+        return interaction.editReply({ content: 'Gagal update: Data bug tidak ditemukan.' });
+      }
+
+      const channel = await interaction.client.channels.fetch(channelId);
+      if (channel) {
+        const message = await channel.messages.fetch(messageId);
+        if (message) {
+          const originalEmbed = message.embeds[0];
+          
+          const realmNames = updatedBug.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
+          const priorityMap = {
+            'Minor': { name: '🟢 Minor' },
+            'Mayor': { name: '🟡 Mayor' },
+            'Critical': { name: '🔴 Critical' }
+          };
+          const pStyle = priorityMap[updatedBug.priority] || { name: 'Unknown' };
+
+          const fullDescription = 
+            `## <:rotating_light:1353870512450834443> Verification Bug Report Details\n` +
+            `**Judul**: ${updatedBug.title}\n` +
+            `**Realms**: ${realmNames}\n` +
+            `**Priority**: ${pStyle.name}\n` +
+            `### <:gforms:1353187627150606418> Deskripsi:\n` + 
+            `${updatedBug.description}`;
+
+          const updatedEmbed = new EmbedBuilder(originalEmbed.toJSON())
+            .setDescription(fullDescription);
+
+          await message.edit({ embeds: [updatedEmbed] });
+        }
+      }
+
+      // Re-render dropdowns to reflect changes
+      const realmOptions = Object.keys(config.realmsConfig).map(key => 
+        new StringSelectMenuOptionBuilder()
+          .setLabel(config.realmsConfig[key].name)
+          .setValue(key)
+          .setDefault(updatedBug.realms.includes(key))
+      );
+      
+      const realmMenu = new StringSelectMenuBuilder()
+        .setCustomId(`bug_edit_realm_${bugId}_${channelId}_${messageId}`)
+        .setPlaceholder('Ubah Realms')
+        .setMinValues(1)
+        .setMaxValues(realmOptions.length)
+        .addOptions(realmOptions);
+
+      const priorityMenu = new StringSelectMenuBuilder()
+        .setCustomId(`bug_edit_priority_${bugId}_${channelId}_${messageId}`)
+        .setPlaceholder('Ubah Prioritas')
+        .addOptions(
+          new StringSelectMenuOptionBuilder().setLabel('Minor').setValue('Minor').setEmoji('🟢').setDefault(updatedBug.priority === 'Minor'),
+          new StringSelectMenuOptionBuilder().setLabel('Mayor').setValue('Mayor').setEmoji('🟡').setDefault(updatedBug.priority === 'Mayor'),
+          new StringSelectMenuOptionBuilder().setLabel('Critical').setValue('Critical').setEmoji('🔴').setDefault(updatedBug.priority === 'Critical')
+        );
+        
+      const doneButton = new ButtonBuilder()
+          .setCustomId('bug_edit_done')
+          .setLabel('Selesai Edit')
+          .setStyle(ButtonStyle.Success);
+
+      const row1 = new ActionRowBuilder().addComponents(realmMenu);
+      const row2 = new ActionRowBuilder().addComponents(priorityMenu);
+      const row3 = new ActionRowBuilder().addComponents(doneButton);
+
+      await interaction.editReply({ 
+        content: `✅ Realms berhasil diperbarui.`,
+        components: [row1, row2, row3]
+      });
+
+    } catch (error) {
+      console.error('Gagal update realms:', error);
+      await interaction.editReply({ content: 'Terjadi kesalahan saat mengupdate realms.' });
+    }
+  }
+
+  else if (interaction.customId.startsWith('bug_edit_priority_')) {
+    await interaction.deferUpdate({ flags: [MessageFlags.Ephemeral] });
+    
+    const parts = interaction.customId.split('_');
+    const bugId = parts[3];
+    const channelId = parts[4];
+    const messageId = parts[5];
+    const newPriority = interaction.values[0];
+
+    try {
+      let updatedBug;
+      await jsonDb.update(pendingBugsPath, (bugs) => {
+        if (bugs[bugId]) {
+          bugs[bugId].priority = newPriority;
+          updatedBug = bugs[bugId];
+        }
+        return bugs;
+      }, {});
+
+      if (!updatedBug) {
+        return interaction.editReply({ content: 'Gagal update: Data bug tidak ditemukan.' });
+      }
+
+      const channel = await interaction.client.channels.fetch(channelId);
+      if (channel) {
+        const message = await channel.messages.fetch(messageId);
+        if (message) {
+          const originalEmbed = message.embeds[0];
+          
+          const realmNames = updatedBug.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
+          const priorityMap = {
+            'Minor': { name: '🟢 Minor' },
+            'Mayor': { name: '🟡 Mayor' },
+            'Critical': { name: '🔴 Critical' }
+          };
+          const pStyle = priorityMap[updatedBug.priority] || { name: 'Unknown' };
+
+          const fullDescription = 
+            `## <:rotating_light:1353870512450834443> Verification Bug Report Details\n` +
+            `**Judul**: ${updatedBug.title}\n` +
+            `**Realms**: ${realmNames}\n` +
+            `**Priority**: ${pStyle.name}\n` +
+            `### <:gforms:1353187627150606418> Deskripsi:\n` + 
+            `${updatedBug.description}`;
+            
+          const updatedEmbed = new EmbedBuilder(originalEmbed.toJSON())
+            .setDescription(fullDescription);
+            
+          await message.edit({ embeds: [updatedEmbed] });
+        }
+      }
+
+      // Re-render dropdowns to reflect changes
+      const realmOptions = Object.keys(config.realmsConfig).map(key => 
+        new StringSelectMenuOptionBuilder()
+          .setLabel(config.realmsConfig[key].name)
+          .setValue(key)
+          .setDefault(updatedBug.realms.includes(key))
+      );
+      
+      const realmMenu = new StringSelectMenuBuilder()
+        .setCustomId(`bug_edit_realm_${bugId}_${channelId}_${messageId}`)
+        .setPlaceholder('Ubah Realms')
+        .setMinValues(1)
+        .setMaxValues(realmOptions.length)
+        .addOptions(realmOptions);
+
+      const priorityMenu = new StringSelectMenuBuilder()
+        .setCustomId(`bug_edit_priority_${bugId}_${channelId}_${messageId}`)
+        .setPlaceholder('Ubah Prioritas')
+        .addOptions(
+          new StringSelectMenuOptionBuilder().setLabel('Minor').setValue('Minor').setEmoji('🟢').setDefault(updatedBug.priority === 'Minor'),
+          new StringSelectMenuOptionBuilder().setLabel('Mayor').setValue('Mayor').setEmoji('🟡').setDefault(updatedBug.priority === 'Mayor'),
+          new StringSelectMenuOptionBuilder().setLabel('Critical').setValue('Critical').setEmoji('🔴').setDefault(updatedBug.priority === 'Critical')
+        );
+        
+      const doneButton = new ButtonBuilder()
+          .setCustomId('bug_edit_done')
+          .setLabel('Selesai Edit')
+          .setStyle(ButtonStyle.Success);
+
+      const row1 = new ActionRowBuilder().addComponents(realmMenu);
+      const row2 = new ActionRowBuilder().addComponents(priorityMenu);
+      const row3 = new ActionRowBuilder().addComponents(doneButton);
+
+      await interaction.editReply({ 
+        content: `✅ Prioritas berhasil diubah menjadi **${newPriority}**.`, 
+        components: [row1, row2, row3] 
+      });
+      
+    } catch (error) {
+      console.error('Gagal update prioritas:', error);
+      await interaction.editReply({ content: 'Terjadi kesalahan saat mengupdate prioritas.' });
+    }
+  }
 }
 
 async function handleButton(interaction) {
@@ -684,7 +1050,7 @@ async function handleButton(interaction) {
         )
 
       await originalMessage.reply({
-        content: '@/everyone',
+        content: 'EVERYONE',
         embeds: [doneEmbed]
       });
 
@@ -711,6 +1077,7 @@ async function handleButton(interaction) {
       }
     }
   }
+
   else if (interaction.customId === 'reportButton') {
     const modal = new ModalBuilder()
       .setCustomId('reportModal')
@@ -765,17 +1132,25 @@ async function handleButton(interaction) {
   else if (interaction.customId.startsWith('bug_reject_')) {
     const bugId = interaction.customId.split('_')[2];
     
-    await jsonDb.update(pendingBugsPath, (bugs) => {
-      delete bugs[bugId];
-      return bugs;
-    }, {});
-    
-    await interaction.message.delete();
-    
+    try {
+      await jsonDb.update(pendingBugsPath, (bugs) => {
+        delete bugs[bugId];
+        return bugs;
+      }, {});
+      
+      await interaction.reply({ 
+        content: '❌ Laporan bug telah ditolak dan dihapus.', 
+        flags: [MessageFlags.Ephemeral] 
+      });
+      
+      await interaction.message.delete();
+    } catch (error) {
+      console.error('[ERROR] Failed in bug_reject:', error);
+    }
   }
 
   else if (interaction.customId.startsWith('bug_approve_')) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
     const bugId = interaction.customId.split('_')[2];
     
     // Ambil data terbaru dari file
@@ -798,14 +1173,67 @@ async function handleButton(interaction) {
       const originalEmbed = interaction.message.embeds[0];
       const approvedEmbed = new EmbedBuilder(originalEmbed.toJSON())
         .setColor('#57F287')
-        .setTitle(`[DISETUJUI] ${originalEmbed.title}`)
-        .setFooter({ text: `Disetujui oleh ${interaction.user.tag} | ID: ${bugId}` });
+        .setFooter({ 
+          text: `—Approved by ${interaction.user.tag}`,
+          iconURL: `${interaction.user.displayAvatarURL()}`
+        });
         
       await interaction.message.edit({
-        content: `Bug report ini telah disetujui oleh <@${interaction.user.id}> dan ditambahkan ke list.`,
+        content: '✅ Laporan bug telah disetujui dan ditambahkan ke Google Sheet.',
         embeds: [approvedEmbed],
         components: []
       });
+
+      // Kirim log ke channel Bug Log
+      try {
+        if (config.bugLogId) {
+          const logChannel = await interaction.client.channels.fetch(config.bugLogId);
+          if (logChannel) {
+            const realmNames = bugData.realms.map(r => config.realmsConfig[r]?.name || r).join(', ');
+            const priorityMap = {
+              'Minor': { name: '🟢 Minor' },
+              'Mayor': { name: '🟡 Mayor' },
+              'Critical': { name: '🔴 Critical' }
+            };
+            const pStyle = priorityMap[bugData.priority] || { name: 'Unknown' };
+
+            const logEmbed = new EmbedBuilder()
+              .setColor('#ff0000')
+              .addFields(
+                { name: 'Pelapor', value: `<@${bugData.reporterId}>`, inline: true },
+                { name: 'Waktu', value: `<t:${Math.floor(new Date(bugData.timestamp).getTime() / 1000)}:f>`, inline: true },
+                { name: 'Sheet', value: '[Google Sheet](https://docs.google.com/spreadsheets/d/1DpaZEunq0ptn72sRDt4sBqwT7k7MgF3f2LgfYAfmPV0/edit?usp=sharing)', inline: true }
+              )
+              .setDescription(
+                `## <:rotating_light:1353870512450834443> Bug Report Details\n` +
+                `**Judul**: ${bugData.title}\n` +
+                `**Realms**: ${realmNames}\n` +
+                `**Priority**: ${pStyle.name}\n` +
+                `### <:gforms:1353187627150606418> Deskripsi:\n` + 
+                `${bugData.description}`
+              )
+              .setFooter({ 
+                text: `—Approved by ${interaction.user.tag}`,
+                iconURL: `${interaction.user.displayAvatarURL()}`
+              })
+              .setTimestamp();
+            
+            await logChannel.send({ 
+              content: `# <:megaphone:1418541090235224074> — New Bug Report!\n\n<@&${DEVELOPER_ROLE_ID}>`,
+              embeds: [logEmbed] 
+            });
+            
+            if (bugData.imageUrls && bugData.imageUrls.length > 0) {
+              await logChannel.send({
+                content: 'Bukti:',
+                files: bugData.imageUrls 
+              })
+            }
+          }
+        }
+      } catch (logErr) {
+        console.error('Gagal mengirim log ke channel bug log:', logErr);
+      }
 
       await interaction.editReply({ content: '✅ Laporan berhasil disetujui dan dicatat.' });
       
@@ -814,19 +1242,83 @@ async function handleButton(interaction) {
       await interaction.editReply({ content: 'Gagal mengirim data ke Google Sheets. Cek console.' });
     }
   }
+
+  else if (interaction.customId === 'bug_edit_done') {
+      try {
+        await interaction.update({ content: '✅ Pengeditan selesai.', components: [] });
+      } catch (error) {
+        console.warn('Caught error in bug_edit_done:', error);
+      }
+  }
+
+  else if (interaction.customId.startsWith('bug_edit_')) {
+    const bugId = interaction.customId.split('_')[2];
+    
+    const allPendingBugs = await jsonDb.read(pendingBugsPath, {});
+    const bugData = allPendingBugs[bugId];
+
+    if (!bugData) {
+      return interaction.reply({ content: 'Error: Data bug report tidak ditemukan.', flags: [MessageFlags.Ephemeral] });
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(`bug_edit_modal_${bugId}`)
+      .setTitle('Edit Bug Report');
+
+    const titleInput = new TextInputBuilder()
+      .setCustomId('editBugTitle')
+      .setLabel("Judul Bug Report")
+      .setStyle(TextInputStyle.Short)
+      .setValue(bugData.title)
+      .setRequired(true);
+
+    const descriptionInput = new TextInputBuilder()
+      .setCustomId('editBugDescription')
+      .setLabel("Deskripsi Bug")
+      .setStyle(TextInputStyle.Paragraph)
+      .setValue(bugData.description)
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(titleInput),
+      new ActionRowBuilder().addComponents(descriptionInput)
+    );
+
+    try {
+      await interaction.showModal(modal);
+    } catch (err) {
+      if (err.code === 10062) {
+        console.warn('[WARN] Interaction expired when showing edit modal. Network lag?');
+        return;
+      }
+      throw err;
+    }
+  }
 }
 
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
-    if (interaction.isChatInputCommand()) {
-      await handleChatInputCommand(interaction);
-    } else if (interaction.isModalSubmit()) {
-      await handleModalSubmit(interaction);
-    } else if (interaction.isStringSelectMenu()) {
-      await handleSelectMenu(interaction);
-    } else if (interaction.isButton()) {
-      await handleButton(interaction);
+    try {
+      if (interaction.isChatInputCommand()) {
+        await handleChatInputCommand(interaction);
+      } else if (interaction.isModalSubmit()) {
+        await handleModalSubmit(interaction);
+      } else if (interaction.isStringSelectMenu()) {
+        await handleSelectMenu(interaction);
+      } else if (interaction.isButton()) {
+        await handleButton(interaction);
+      }
+    } catch (error) {
+      console.error('Unhandled error in interactionCreate:', error);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: 'Terjadi kesalahan internal pada bot.', flags: [MessageFlags.Ephemeral] });
+        } else {
+          await interaction.followUp({ content: 'Terjadi kesalahan internal pada bot.', flags: [MessageFlags.Ephemeral] });
+        }
+      } catch (err) {
+      }
     }
   },
 };

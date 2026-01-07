@@ -34,6 +34,19 @@ async function addBugToSheet(bugData) {
 
     // Ubah array realm keys menjadi nama
     const realmNames = bugData.realms.map(key => config.realmsConfig[key]?.name || key).join(', ');
+    
+    // Format timestamp seperti |7/1/2026, 10.36.53|
+    const dateObj = new Date(bugData.timestamp);
+    const dateStr = dateObj.toLocaleDateString('en-US', { timeZone: 'Asia/Jakarta' }); // 7/1/2026
+    const timeStr = dateObj.toLocaleTimeString('id-ID', { 
+        timeZone: 'Asia/Jakarta', 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit', 
+        hour12: false 
+    }).replace(/:/g, '.');
+    
+    const timeFormat = `${dateStr}, ${timeStr}`;
 
     // Load cells untuk area kerja.
     // Kita cek baris 6 sampai 200 (index 5 sampai 199).
@@ -73,7 +86,7 @@ async function addBugToSheet(bugData) {
     sheet.getCell(targetRowIndex, 1).value = noUrut; // B: No
     sheet.getCell(targetRowIndex, 2).value = bugData.priority; // C: Prioritas
     sheet.getCell(targetRowIndex, 3).value = 'Berjalan'; // D: Status
-    sheet.getCell(targetRowIndex, 4).value = bugData.timestamp; // E: Waktu
+    sheet.getCell(targetRowIndex, 4).value = timeFormat; // E: Waktu
     sheet.getCell(targetRowIndex, 5).value = realmNames; // F: Realm
     sheet.getCell(targetRowIndex, 6).value = bugData.title; // G: Judul
     sheet.getCell(targetRowIndex, 7).value = bugData.description; // H: Deskripsi

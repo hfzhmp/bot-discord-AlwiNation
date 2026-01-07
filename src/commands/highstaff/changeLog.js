@@ -5,8 +5,18 @@ module.exports = {
     .setName('changelog')
     .setDescription('[Staff] Membuat catatan changelog baru untuk server/realms.')
     .addAttachmentOption(option =>
-      option.setName('gambar') // Opsional
-        .setDescription('Lampirkan gambar opsional untuk changelog ini.')
+      option.setName('gambar-1')
+        .setDescription('Lampirkan gambar pertama (opsional).')
+        .setRequired(false)
+    )
+    .addAttachmentOption(option =>
+      option.setName('gambar-2')
+        .setDescription('Lampirkan gambar kedua (opsional).')
+        .setRequired(false)
+    )
+    .addAttachmentOption(option =>
+      option.setName('gambar-3')
+        .setDescription('Lampirkan gambar ketiga (opsional).')
         .setRequired(false)
     ),
 

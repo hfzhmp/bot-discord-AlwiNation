@@ -5,8 +5,18 @@ module.exports = {
     .setName('report')
     .setDescription('Melaporkan staff yang melanggar aturan.')
     .addAttachmentOption(option =>
-      option.setName('gambar')
-        .setDescription('Lampirkan gambar untuk menjadi bukti.')
+      option.setName('bukti-1')
+        .setDescription('Lampirkan bukti gambar pertama (opsional).')
+        .setRequired(false)
+    )
+    .addAttachmentOption(option =>
+      option.setName('bukti-2')
+        .setDescription('Lampirkan bukti gambar kedua (opsional).')
+        .setRequired(false)
+    )
+    .addAttachmentOption(option =>
+      option.setName('bukti-3')
+        .setDescription('Lampirkan bukti gambar ketiga (opsional).')
         .setRequired(false)
     ),
 

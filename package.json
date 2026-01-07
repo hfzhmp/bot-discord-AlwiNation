@@ -11,7 +11,7 @@
     "ky": "0.33.0"
   },
   "name": "alwination-bot",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "main": "src/bot.js",
   "scripts": {
     "start": "cross-env NODE_ICU_DATA=./node_modules/full-icu node src/bot.js",
